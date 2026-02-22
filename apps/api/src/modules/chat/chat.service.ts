@@ -20,30 +20,32 @@ export interface ChatMessage {
 
 export interface ChatResponse {
   message: string;
-  flightResults?: BaseResponse | null;
+  flightResults: BaseResponse | null;
 }
 
 @Injectable()
 export class ChatService {
-  private lastFlightResult: BaseResponse | null = null;
+  private openaiKey: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly flightSearchService: FlightSearchService,
     private readonly priceHistoryService: PriceHistoryService,
-  ) {}
-
-  async chat(messages: ChatMessage[]): Promise<ChatResponse> {
-    this.lastFlightResult = null;
+  ) {
     const openaiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!openaiKey) {
       throw new Error('OPENAI_API_KEY is not configured');
     }
-    process.env.OPENAI_API_KEY = openaiKey;
+    this.openaiKey = openaiKey;
+  }
 
+  async chat(messages: ChatMessage[]): Promise<ChatResponse> {
+    let lastFlightResult: BaseResponse | null = null;
+
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD for date resolution
     const searchFlightsTool = new DynamicStructuredTool({
       name: 'search_flights',
-      description: `Search for flights using Google Flights. Use IATA 3-letter airport codes (e.g. JFK, CDG, LHR) for departure_id and arrival_id. Dates in YYYY-MM-DD format. type: 1 = round trip, 2 = one way.`,
+      description: `Search for flights using Google Flights. Use IATA 3-letter airport codes (e.g. JFK, CDG, LHR) for departure_id and arrival_id. Dates in YYYY-MM-DD; outbound_date must be today or in the future (today is ${today}). type: 1 = round trip, 2 = one way.`,
       schema: z.object({
         departure_id: z
           .string()
@@ -63,7 +65,6 @@ export class ChatService {
       }),
       func: async (args) => {
         const params = {
-          engine: 'google_flights' as const,
           departure_id: args.departure_id,
           arrival_id: args.arrival_id,
           outbound_date: args.outbound_date,
@@ -71,17 +72,8 @@ export class ChatService {
           type: args.type ?? 2,
         };
         const result = await this.flightSearchService.searchFlight(params);
-        await this.priceHistoryService.saveSearch(
-          {
-            departure_id: args.departure_id,
-            arrival_id: args.arrival_id,
-            outbound_date: args.outbound_date,
-            return_date: args.return_date ?? undefined,
-            type: args.type ?? 2,
-          },
-          result,
-        );
-        this.lastFlightResult = result;
+        await this.priceHistoryService.saveSearch(params, result);
+        lastFlightResult = result;
         return JSON.stringify(result);
       },
     });
@@ -89,7 +81,7 @@ export class ChatService {
     const prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        'You are a helpful flight search assistant. Use the search_flights tool to find real-time flight options from Google Flights. When the user asks for flights, call the tool with IATA airport codes and dates (YYYY-MM-DD). Summarize the results clearly with airlines, prices, and times. For follow-up requests (e.g. "only direct" or "Friday instead"), call the tool again with the refined parameters.',
+        `You are a helpful flight search assistant. Use the search_flights tool to find real-time flight options from Google Flights. When the user asks for flights, call the tool with IATA airport codes and dates (YYYY-MM-DD). Today is ${today}—always use today or future dates (e.g. "this weekend" = upcoming Saturday/Sunday, "next weekend" = the following one). Summarize the results clearly with airlines, prices, and times. For follow-up requests (e.g. "only direct" or "Friday instead"), call the tool again with the refined parameters.`,
       ],
       new MessagesPlaceholder('chat_history'),
       ['human', '{input}'],
@@ -99,7 +91,7 @@ export class ChatService {
     const llm = new ChatOpenAI({
       model: 'gpt-4o',
       temperature: 0,
-      openAIApiKey: openaiKey,
+      openAIApiKey: this.openaiKey,
     });
 
     const agent = createToolCallingAgent({
@@ -129,7 +121,7 @@ export class ChatService {
 
     return {
       message,
-      flightResults: this.lastFlightResult ?? undefined,
+      flightResults: lastFlightResult ?? null,
     };
   }
 

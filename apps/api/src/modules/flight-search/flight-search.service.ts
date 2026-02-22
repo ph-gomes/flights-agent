@@ -11,7 +11,13 @@ export class FlightSearchService {
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
-    this.apiKey = this.configService.get('SERP_API_KEY') ?? '';
+    const serpKey = this.configService.get<string>('SERP_API_KEY');
+    if (!serpKey) {
+      throw new Error(
+        'SERP_API_KEY is not configured. Add it to .env to enable Google Flights search (see https://serpapi.com).',
+      );
+    }
+    this.apiKey = serpKey;
   }
 
   async _searchFlight(parameters: EngineParameters): Promise<BaseResponse> {

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import type { ChatMessage as ApiChatMessage, ChatResponse } from "./types/chat";
 import { FlightResults } from "./components/FlightResults";
+import { MarkdownContent } from "./components/MarkdownContent";
 import { PriceHistoryPanel } from "./components/PriceHistoryPanel";
 import "./App.css";
 
@@ -77,7 +78,7 @@ export default function App() {
         <p className="subtitle">Ask for flights in plain language (e.g. “Flights from JFK to Paris next weekend”).</p>
       </header>
 
-      <main className="app-main">
+      <main className={`app-main ${flightResults ? "has-flight-results" : ""}`}>
         <div className="chat-container">
           <div className="messages" role="log" aria-live="polite">
             {messages.length === 0 && (
@@ -86,7 +87,13 @@ export default function App() {
             {messages.map((m, i) => (
               <div key={i} className={`message message-${m.role}`}>
                 <span className="message-role">{m.role === "user" ? "You" : "Assistant"}</span>
-                <div className="message-content">{m.content}</div>
+                <div className="message-content">
+                  {m.role === "assistant" ? (
+                    <MarkdownContent content={m.content} />
+                  ) : (
+                    m.content
+                  )}
+                </div>
               </div>
             ))}
             {loading && (
@@ -96,8 +103,6 @@ export default function App() {
               </div>
             )}
           </div>
-
-          {flightResults && <FlightResults data={flightResults} />}
 
           {error && <p className="error">{error}</p>}
 
@@ -122,6 +127,12 @@ export default function App() {
             </button>
           </div>
         </div>
+
+        {flightResults && (
+          <div className="flight-results-section">
+            <FlightResults data={flightResults} />
+          </div>
+        )}
 
         {showPriceHistory && (
           <>

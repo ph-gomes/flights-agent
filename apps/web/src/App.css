@@ -1,10 +1,26 @@
 .app {
-  max-width: 720px;
+  max-width: min(1100px, 96vw);
   margin: 0 auto;
   padding: 1.5rem;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+@media (min-width: 900px) {
+  .app-main.has-flight-results {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  .app-main.has-flight-results .chat-container {
+    min-width: 0;
+  }
+  .app-main.has-flight-results .flight-results-section {
+    position: sticky;
+    top: 1.5rem;
+  }
 }
 
 .app-header {
@@ -52,7 +68,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  max-width: 90%;
+  max-width: 85%;
 }
 
 .message-user {
@@ -70,10 +86,64 @@
 }
 
 .message-content {
-  padding: 0.5rem 0.75rem;
+  padding: 0.6rem 0.9rem;
   border-radius: 8px;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.message-content p {
+  margin: 0 0 0.5rem 0;
+}
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+.message-content ul,
+.message-content ol {
+  margin: 0.25rem 0 0.5rem 0;
+  padding-left: 1.25rem;
+}
+.message-content li {
+  margin-bottom: 0.2rem;
+}
+.message-content strong {
+  font-weight: 600;
+}
+.message-content code {
+  font-size: 0.9em;
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+.message-content pre {
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  background: rgba(0, 0, 0, 0.2);
+}
+.message-content pre code {
+  padding: 0;
+  background: none;
+}
+.message-content h1, .message-content h2, .message-content h3 {
+  margin: 0.75rem 0 0.35rem 0;
+  font-size: 1em;
+  font-weight: 600;
+}
+.message-content h1 { font-size: 1.15em; }
+.message-content h2 { font-size: 1.05em; }
+.message-content table {
+  border-collapse: collapse;
+  font-size: 0.9em;
+  margin: 0.5rem 0;
+}
+.message-content th, .message-content td {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+}
+.message-content th {
+  font-weight: 600;
 }
 
 .message-user .message-content {
@@ -150,7 +220,17 @@
 
 .flight-results h3 {
   font-size: 1rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.flight-results-summary {
+  font-size: 0.9rem;
+  color: var(--subtitle-color, #aaa);
   margin: 0 0 0.75rem 0;
+}
+
+.flight-results-summary strong {
+  color: #81c784;
 }
 
 .flight-list {
@@ -163,17 +243,26 @@
 }
 
 .flight-card {
-  padding: 0.75rem;
-  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: var(--card-bg, rgba(255, 255, 255, 0.03));
+  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+}
+
+.flight-card-route {
+  font-size: 0.8rem;
+  color: var(--subtitle-color, #aaa);
+  margin-bottom: 0.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .flight-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.4rem;
 }
 
 .flight-airline {
@@ -189,8 +278,26 @@
   font-size: 0.85rem;
   color: var(--subtitle-color, #aaa);
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.flight-detail {
+  display: block;
+}
+
+.flight-legs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.flight-leg {
+  font-size: 0.8rem;
+  color: var(--subtitle-color, #999);
 }
 
 /* Price history panel */

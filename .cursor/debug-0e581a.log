@@ -1,0 +1,5 @@
+{"sessionId":"0e581a","location":"chat.service.ts:tool_entry","message":"search_flights tool invoked","data":{"departure_id":"JFK","arrival_id":"CDG","outbound_date":"2026-02-28"},"timestamp":1771778938683,"hypothesisId":"H4"}
+{"sessionId":"0e581a","location":"flight-search.service.ts:searchFlight_entry","message":"searchFlight called","data":{"engine":"google_flights"},"timestamp":1771778938684,"hypothesisId":"H5"}
+{"sessionId":"0e581a","location":"flight-search.service.ts:after_getJson","message":"_searchFlight returned","data":{"hasErrorInResponse":false},"timestamp":1771778940039,"hypothesisId":"H2"}
+{"sessionId":"0e581a","location":"chat.service.ts:after_searchFlight","message":"searchFlight returned","data":{"hasErrorInResponse":false},"timestamp":1771778940041,"hypothesisId":"H2"}
+{"sessionId":"0e581a","location":"chat.service.ts:agent_done","message":"executor finished","data":{"hasFlightResults":true},"timestamp":1771778944662,"hypothesisId":"H4"}

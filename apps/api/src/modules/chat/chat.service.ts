@@ -7,7 +7,7 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { BaseResponse } from 'serpapi';
 import { FlightSearchService } from '../flight-search/flight-search.service';
@@ -25,6 +25,8 @@ export interface ChatResponse {
 
 @Injectable()
 export class ChatService {
+  private lastFlightResult: BaseResponse | null = null;
+  private readonly logger = new Logger(ChatService.name);
   private openaiKey: string;
 
   constructor(
@@ -40,7 +42,8 @@ export class ChatService {
   }
 
   async chat(messages: ChatMessage[]): Promise<ChatResponse> {
-    let lastFlightResult: BaseResponse | null = null;
+    this.lastFlightResult = null;
+    this.logger.debug(`chat() called with ${messages.length} message(s)`);
 
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD for date resolution
     const searchFlightsTool = new DynamicStructuredTool({
@@ -71,9 +74,21 @@ export class ChatService {
           return_date: args.return_date ?? undefined,
           type: args.type ?? 2,
         };
+        this.logger.debug(
+          `search_flights tool invoked: ${JSON.stringify(params)}`,
+        );
         const result = await this.flightSearchService.searchFlight(params);
+        const bestCount = Array.isArray(result?.best_flights)
+          ? result.best_flights.length
+          : 0;
+        const otherCount = Array.isArray(result?.other_flights)
+          ? result.other_flights.length
+          : 0;
+        this.logger.debug(
+          `search_flights result: ${bestCount} best, ${otherCount} other`,
+        );
         await this.priceHistoryService.saveSearch(params, result);
-        lastFlightResult = result;
+        this.lastFlightResult = result;
         return JSON.stringify(result);
       },
     });
@@ -108,6 +123,9 @@ export class ChatService {
     });
 
     const { input, chat_history } = this.toAgentInput(messages);
+    this.logger.debug(
+      `agent input: "${input.slice(0, 80)}${input.length > 80 ? '...' : ''}", history length: ${chat_history.length}`,
+    );
     const result = await executor.invoke({
       input,
       chat_history,
@@ -119,9 +137,12 @@ export class ChatService {
         : ((result.output as { output?: string })?.output ??
           'I could not complete your request.');
 
+    this.logger.debug(
+      `chat() completed, response length: ${message.length}, hasFlightResults: ${this.lastFlightResult !== null}`,
+    );
     return {
       message,
-      flightResults: lastFlightResult ?? null,
+      flightResults: this.lastFlightResult ?? null,
     };
   }
 

@@ -10,8 +10,6 @@ export default function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [flightResults, setFlightResults] = useState<ChatResponse["flightResults"]>(null);
-  const [lastRoute, setLastRoute] = useState<{ departure: string; arrival: string } | null>(null);
   const [showPriceHistory, setShowPriceHistory] = useState(false);
   const [priceHistoryRoute, setPriceHistoryRoute] = useState<{
     departure: string;
@@ -28,26 +26,38 @@ export default function App() {
     setInput("");
     setLoading(true);
     setError(null);
-    setFlightResults(null);
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({
+          messages: newMessages.map(({ role, content }) => ({ role, content })),
+        }),
       });
       const data = (await res.json()) as ChatResponse & { message?: string };
       if (!res.ok) {
         const msg = data?.message ?? `Request failed: ${res.status}`;
         throw new Error(msg);
       }
-      setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
-      setFlightResults(data.flightResults ?? null);
+      const assistantMessage: ApiChatMessage = {
+        role: "assistant",
+        content: data.message,
+        flightResults: data.flightResults ?? null,
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+
       if (data.flightResults && "best_flights" in data.flightResults) {
-        const first = data.flightResults.best_flights?.[0] ?? data.flightResults.other_flights?.[0];
-        const dep = (first as { departure_airport?: { id?: string } })?.departure_airport?.id;
-        const arr = (first as { arrival_airport?: { id?: string } })?.arrival_airport?.id;
-        if (dep && arr) setLastRoute({ departure: dep, arrival: arr });
+        const first =
+          data.flightResults.best_flights?.[0] ??
+          data.flightResults.other_flights?.[0];
+        const dep = (first as { departure_airport?: { id?: string } })
+          ?.departure_airport?.id;
+        const arr = (first as { arrival_airport?: { id?: string } })
+          ?.arrival_airport?.id;
+        if (dep && arr) {
+          setPriceHistoryRoute({ departure: dep, arrival: arr });
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -57,43 +67,47 @@ export default function App() {
   }, [input, loading, messages]);
 
   const openPriceHistory = useCallback(() => {
-    if (lastRoute) {
-      setPriceHistoryRoute(lastRoute);
-      setShowPriceHistory(true);
-    } else {
-      setPriceHistoryRoute(null);
-      setShowPriceHistory(true);
-    }
-  }, [lastRoute]);
+    setShowPriceHistory(true);
+  }, []);
 
   const closePriceHistory = useCallback(() => {
     setShowPriceHistory(false);
     setPriceHistoryRoute(null);
   }, []);
 
-  return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Flight search</h1>
-        <p className="subtitle">Ask for flights in plain language (e.g. “Flights from JFK to Paris next weekend”).</p>
-      </header>
+  const hasAnyFlightResults = messages.some(
+    (m) => m.role === "assistant" && m.flightResults,
+  );
 
-      <main className={`app-main ${flightResults ? "has-flight-results" : ""}`}>
+  return (
+    <div className="app app-dark">
+      <main className="app-main">
         <div className="chat-container">
           <div className="messages" role="log" aria-live="polite">
             {messages.length === 0 && (
-              <p className="messages-empty">Send a message to search for flights.</p>
+              <p className="messages-empty">
+                Send a message to search for flights.
+              </p>
             )}
             {messages.map((m, i) => (
               <div key={i} className={`message message-${m.role}`}>
-                <span className="message-role">{m.role === "user" ? "You" : "Assistant"}</span>
-                <div className="message-content">
-                  {m.role === "assistant" ? (
-                    <MarkdownContent content={m.content} />
-                  ) : (
-                    m.content
-                  )}
-                </div>
+                <span className="message-role">
+                  {m.role === "user" ? "You" : "Assistant"}
+                </span>
+                {m.role === "assistant" ? (
+                  <>
+                    <div className="message-content">
+                      <MarkdownContent content={m.content} />
+                    </div>
+                    {m.flightResults && (
+                      <div className="message-cards">
+                        <FlightResults data={m.flightResults} />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="message-content">{m.content}</div>
+                )}
               </div>
             ))}
             {loading && (
@@ -106,54 +120,81 @@ export default function App() {
 
           {error && <p className="error">{error}</p>}
 
-          <div className="input-row">
+          {hasAnyFlightResults && (
+            <p className="app-disclaimer">
+              Prices and availability may vary. Check the airline or agency for
+              the latest details.
+            </p>
+          )}
+        </div>
+
+        <div className="app-input-area">
+          <div className="app-input-chips">
+            <button
+              type="button"
+              className="app-chip"
+              onClick={openPriceHistory}
+            >
+              View price history
+            </button>
+          </div>
+          <div className="input-row input-row-pro">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-              placeholder="e.g. Flights from JFK to CDG on 2025-03-01"
+              onKeyDown={(e) =>
+                e.key === "Enter" && !e.shiftKey && sendMessage()
+              }
+              placeholder="Write your question..."
               aria-label="Message"
               disabled={loading}
             />
-            <button type="button" onClick={sendMessage} disabled={loading}>
-              Send
-            </button>
-          </div>
-
-          <div className="actions">
-            <button type="button" className="link-button" onClick={openPriceHistory}>
-              View price history
+            <button
+              type="button"
+              className="app-input-send"
+              onClick={sendMessage}
+              disabled={loading}
+              aria-label="Send"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M22 2L11 13" />
+                <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+              </svg>
             </button>
           </div>
         </div>
-
-        {flightResults && (
-          <div className="flight-results-section">
-            <FlightResults data={flightResults} />
-          </div>
-        )}
-
-        {showPriceHistory && (
-          <>
-            <div className="overlay" onClick={closePriceHistory} aria-hidden />
-            <div className="panel-wrapper">
-              {priceHistoryRoute ? (
-                <PriceHistoryPanel
-                  departureId={priceHistoryRoute.departure}
-                  arrivalId={priceHistoryRoute.arrival}
-                  onClose={closePriceHistory}
-                />
-              ) : (
-                <PriceHistoryRouteForm
-                  onLoad={(dep, arr) => setPriceHistoryRoute({ departure: dep, arrival: arr })}
-                  onClose={closePriceHistory}
-                />
-              )}
-            </div>
-          </>
-        )}
       </main>
+
+      {showPriceHistory && (
+        <>
+          <div className="overlay" onClick={closePriceHistory} aria-hidden />
+          <div className="panel-wrapper">
+            {priceHistoryRoute ? (
+              <PriceHistoryPanel
+                departureId={priceHistoryRoute.departure}
+                arrivalId={priceHistoryRoute.arrival}
+                onClose={closePriceHistory}
+              />
+            ) : (
+              <PriceHistoryRouteForm
+                onLoad={(dep, arr) =>
+                  setPriceHistoryRoute({ departure: dep, arrival: arr })
+                }
+                onClose={closePriceHistory}
+              />
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -168,7 +209,11 @@ function PriceHistoryRouteForm({
   const [dep, setDep] = useState("");
   const [arr, setArr] = useState("");
   return (
-    <div className="price-history-panel" role="dialog" aria-label="Price history">
+    <div
+      className="price-history-panel"
+      role="dialog"
+      aria-label="Price history"
+    >
       <div className="price-history-header">
         <h3>Price history</h3>
         <button type="button" onClick={onClose} aria-label="Close">
@@ -191,7 +236,9 @@ function PriceHistoryRouteForm({
         />
         <button
           type="button"
-          onClick={() => dep.trim() && arr.trim() && onLoad(dep.trim(), arr.trim())}
+          onClick={() =>
+            dep.trim() && arr.trim() && onLoad(dep.trim(), arr.trim())
+          }
         >
           Load history
         </button>

@@ -1,6 +1,8 @@
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  /** When present, flight option cards are shown inline in this message (assistant only). */
+  flightResults?: FlightSearchResponse | null;
 }
 
 export interface ChatResponse {

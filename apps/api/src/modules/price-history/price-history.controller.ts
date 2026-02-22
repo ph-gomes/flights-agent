@@ -1,5 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { PriceHistoryService } from './price-history.service';
+import type { PriceHistoryResponseDto } from './dto/price-history-response.dto';
 
 @Controller('price-history')
 export class PriceHistoryController {
@@ -9,16 +10,16 @@ export class PriceHistoryController {
   async getHistory(
     @Query('departure') departureId: string,
     @Query('arrival') arrivalId: string,
-  ) {
-    if (!departureId || !arrivalId) {
+  ): Promise<PriceHistoryResponseDto & { message?: string }> {
+    if (!departureId?.trim() || !arrivalId?.trim()) {
       return {
         records: [],
         message: 'Provide departure and arrival query params.',
       };
     }
-    const records = await this.priceHistoryService.getHistoryForRoute(
-      departureId,
-      arrivalId,
+    const records = await this.priceHistoryService.getHistoryForRouteDto(
+      departureId.trim(),
+      arrivalId.trim(),
     );
     return { records };
   }

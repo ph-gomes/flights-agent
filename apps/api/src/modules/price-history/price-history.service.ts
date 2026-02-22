@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FlightSearchRecord } from './entities/flight-search-record.entity';
 import type { BaseResponse } from 'serpapi';
+import type { PriceHistoryRecordDto } from './dto/price-history-response.dto';
+import { extractLowestPrice } from './price-history.util';
 
 export interface FlightSearchParams {
   departure_id?: string;
@@ -44,4 +46,28 @@ export class PriceHistoryService {
       take: 50,
     });
   }
+
+  /**
+   * Returns price history for a route as DTOs with lowestPrice extracted for comparison.
+   */
+  async getHistoryForRouteDto(
+    departureId: string,
+    arrivalId: string,
+  ): Promise<PriceHistoryRecordDto[]> {
+    const records = await this.getHistoryForRoute(departureId, arrivalId);
+    return records.map((r) => toRecordDto(r));
+  }
+}
+
+function toRecordDto(record: FlightSearchRecord): PriceHistoryRecordDto {
+  return {
+    id: record.id,
+    departureId: record.departureId,
+    arrivalId: record.arrivalId,
+    outboundDate: record.outboundDate,
+    returnDate: record.returnDate,
+    type: record.type,
+    createdAt: record.createdAt.toISOString(),
+    lowestPrice: extractLowestPrice(record.resultPayload),
+  };
 }

@@ -7,5 +7,6 @@ import { AppCacheModule } from '../../cache.module';
   imports: [AppCacheModule],
   controllers: [FlightSearchController],
   providers: [FlightSearchService],
+  exports: [FlightSearchService],
 })
 export class FlightSearchModule {}

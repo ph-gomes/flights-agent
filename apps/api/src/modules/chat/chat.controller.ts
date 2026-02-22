@@ -1,8 +1,17 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  HttpStatus,
+  HttpException,
+  Logger,
+} from '@nestjs/common';
 import { ChatService, type ChatMessage } from './chat.service';
 
 @Controller('chat')
 export class ChatController {
+  private readonly logger = new Logger(ChatController.name);
+
   constructor(private readonly chatService: ChatService) {}
 
   @Post()
@@ -14,6 +23,19 @@ export class ChatController {
         flightResults: null,
       };
     }
-    return this.chatService.chat(messages);
+    try {
+      return await this.chatService.chat(messages);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Chat request failed';
+      this.logger.warn(
+        `Chat error: ${message}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      throw new HttpException(
+        { message, error: 'Internal Server Error' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

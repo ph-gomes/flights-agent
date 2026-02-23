@@ -107,7 +107,11 @@ function SegmentRow({
           <span className="foc-seg-time">{depTime}</span>
           {depDate && <span className="foc-seg-date">{depDate}</span>}
           <span className="foc-seg-code">{depCode}</span>
-          {depName && <span className="foc-seg-name" title={depName}>{depName}</span>}
+          {depName && (
+            <span className="foc-seg-name" title={depName}>
+              {depName}
+            </span>
+          )}
         </div>
 
         {/* Line with airline info */}
@@ -121,13 +125,18 @@ function SegmentRow({
           </div>
           <div className="foc-seg-line-meta">
             {segment.airline_logo && (
-              <AirlineLogo src={segment.airline_logo} alt={segment.airline ?? ""} />
+              <AirlineLogo
+                src={segment.airline_logo}
+                alt={segment.airline ?? ""}
+              />
             )}
             <span className="foc-seg-flight-num">
               {segment.flight_number ?? segment.airline ?? ""}
             </span>
             {segment.duration != null && (
-              <span className="foc-seg-duration">{formatDuration(segment.duration)}</span>
+              <span className="foc-seg-duration">
+                {formatDuration(segment.duration)}
+              </span>
             )}
           </div>
         </div>
@@ -144,7 +153,11 @@ function SegmentRow({
           </div>
           {arrDate && <span className="foc-seg-date">{arrDate}</span>}
           <span className="foc-seg-code">{arrCode}</span>
-          {arrName && <span className="foc-seg-name" title={arrName}>{arrName}</span>}
+          {arrName && (
+            <span className="foc-seg-name" title={arrName}>
+              {arrName}
+            </span>
+          )}
         </div>
       </div>
 
@@ -179,7 +192,12 @@ function SegmentRow({
 
 function PlaneIcon() {
   return (
-    <svg className="foc-plane-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <svg
+      className="foc-plane-icon"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
       <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" />
     </svg>
   );
@@ -187,7 +205,16 @@ function PlaneIcon() {
 
 function SeatIcon() {
   return (
-    <svg className="foc-seat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      className="foc-seat-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d="M6 2v8a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V2" />
       <line x1="6" y1="18" x2="18" y2="18" />
       <line x1="12" y1="14" x2="12" y2="22" />
@@ -197,7 +224,16 @@ function SeatIcon() {
 
 function ClockIcon() {
   return (
-    <svg className="foc-clock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      className="foc-clock-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
     </svg>
@@ -206,7 +242,16 @@ function ClockIcon() {
 
 function LeafIcon() {
   return (
-    <svg className="foc-leaf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      className="foc-leaf-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
       <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
     </svg>
@@ -215,7 +260,10 @@ function LeafIcon() {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export function FlightOptionCard({ flight, isCheapest }: FlightOptionCardProps) {
+export function FlightOptionCard({
+  flight,
+  isCheapest,
+}: FlightOptionCardProps) {
   const segments = flight.flights ?? [];
   const layovers = flight.layovers ?? [];
   const stops = Math.max(0, segments.length - 1);
@@ -268,11 +316,17 @@ export function FlightOptionCard({ flight, isCheapest }: FlightOptionCardProps) 
           <span className="foc-stops-label" data-nonstop={stops === 0}>
             {stopsLabel(stops)}
           </span>
-          <span className="foc-dot-sep" aria-hidden>·</span>
-          <span className="foc-total-duration">{formatDuration(flight.total_duration)}</span>
+          <span className="foc-dot-sep" aria-hidden>
+            ·
+          </span>
+          <span className="foc-total-duration">
+            {formatDuration(flight.total_duration)}
+          </span>
           {flight.type && (
             <>
-              <span className="foc-dot-sep" aria-hidden>·</span>
+              <span className="foc-dot-sep" aria-hidden>
+                ·
+              </span>
               <span className="foc-trip-type">{flight.type}</span>
             </>
           )}
@@ -321,15 +375,13 @@ export function FlightOptionCard({ flight, isCheapest }: FlightOptionCardProps) 
       {segments.length > 0 && (
         <details className="foc-details">
           <summary className="foc-details-toggle">
-            {segments.length === 1 ? "Flight details" : `${segments.length} flights · ${stops} ${stops === 1 ? "stop" : "stops"}`}
+            {segments.length === 1
+              ? "Flight details"
+              : `${segments.length} flights · ${stops} ${stops === 1 ? "stop" : "stops"}`}
           </summary>
           <div className="foc-details-body">
             {segments.map((seg, i) => (
-              <SegmentRow
-                key={i}
-                segment={seg}
-                layoverAfter={layovers[i]}
-              />
+              <SegmentRow key={i} segment={seg} layoverAfter={layovers[i]} />
             ))}
           </div>
         </details>
@@ -337,20 +389,15 @@ export function FlightOptionCard({ flight, isCheapest }: FlightOptionCardProps) 
 
       {/* ── CO₂ note ── */}
       {co2Diff != null && (
-        <div className={`foc-co2 ${co2Diff < 0 ? "foc-co2-good" : "foc-co2-bad"}`}>
+        <div
+          className={`foc-co2 ${co2Diff < 0 ? "foc-co2-good" : "foc-co2-bad"}`}
+        >
           <LeafIcon />
           {co2Diff < 0
             ? `${Math.abs(co2Diff)}% less CO₂ than typical`
             : `${co2Diff}% more CO₂ than typical`}
         </div>
       )}
-
-      {/* ── Actions ── */}
-      <div className="foc-actions">
-        <button type="button" className="foc-btn-primary">
-          Select flight
-        </button>
-      </div>
     </article>
   );
 }

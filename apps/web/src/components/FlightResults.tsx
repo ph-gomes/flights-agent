@@ -13,25 +13,29 @@ function formatPrice(price: number | undefined) {
 }
 
 const priceLevelClasses: Record<string, string> = {
-  "low prices":     "bg-app-green/15 text-app-green",
+  "low prices": "bg-app-green/15 text-app-green",
   "typical prices": "bg-app-yellow/[0.12] text-app-yellow",
-  "high prices":    "bg-app-red/[0.12] text-app-red",
+  "high prices": "bg-app-red/[0.12] text-app-red",
 };
 
 export function FlightResults({ data, onSetAlert }: FlightResultsProps) {
   if (!data) return null;
 
-  const best: FlightOption[]  = data.best_flights  ?? [];
+  const best: FlightOption[] = data.best_flights ?? [];
   const other: FlightOption[] = data.other_flights ?? [];
   const all = best.length > 0 ? best : other;
   if (all.length === 0) return null;
 
   const lowestFromInsights = data.price_insights?.lowest_price;
-  const prices = all.map((f) => f.price).filter((p): p is number => p != null && Number.isFinite(p));
+  const prices = all
+    .map((f) => f.price)
+    .filter((p): p is number => p != null && Number.isFinite(p));
   const lowestPrice =
     lowestFromInsights != null && Number.isFinite(lowestFromInsights)
       ? lowestFromInsights
-      : prices.length > 0 ? Math.min(...prices) : undefined;
+      : prices.length > 0
+        ? Math.min(...prices)
+        : undefined;
 
   const priceLevel = data.price_insights?.price_level;
   const priceLevelKey = priceLevel?.toLowerCase() ?? "";
@@ -46,11 +50,16 @@ export function FlightResults({ data, onSetAlert }: FlightResultsProps) {
         <div className="flex items-center gap-2 text-[0.82rem]">
           {lowestPrice != null && (
             <span className="text-app-text-muted">
-              From <strong className="text-app-green font-bold">{formatPrice(lowestPrice)}</strong>
+              From{" "}
+              <strong className="text-app-green font-bold">
+                {formatPrice(lowestPrice)}
+              </strong>
             </span>
           )}
           {priceLevel && (
-            <span className={`px-2 py-0.5 rounded-full text-[0.75rem] font-semibold ${priceLevelClasses[priceLevelKey] ?? ""}`}>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[0.75rem] font-semibold ${priceLevelClasses[priceLevelKey] ?? ""}`}
+            >
               {priceLevel}
             </span>
           )}
@@ -63,7 +72,12 @@ export function FlightResults({ data, onSetAlert }: FlightResultsProps) {
           <FlightOptionCard
             key={i}
             flight={flight}
-            isCheapest={lowestPrice != null && flight.price != null && Number.isFinite(flight.price) && flight.price === lowestPrice}
+            isCheapest={
+              lowestPrice != null &&
+              flight.price != null &&
+              Number.isFinite(flight.price) &&
+              flight.price === lowestPrice
+            }
             onSetAlert={onSetAlert}
           />
         ))}

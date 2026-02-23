@@ -1,6 +1,9 @@
 export function SkeletonCard() {
   return (
-    <div className="border-b border-app-border bg-app-surface-2 pointer-events-none last:border-b-0" aria-hidden="true">
+    <div
+      className="border-b border-app-border bg-app-surface-2 pointer-events-none last:border-b-0"
+      aria-hidden="true"
+    >
       <div className="flex items-center gap-4 px-4 py-3">
         <div className="skel-block w-[120px] h-4 shrink-0" />
         <div className="skel-block w-[100px] h-3.5 flex-1" />

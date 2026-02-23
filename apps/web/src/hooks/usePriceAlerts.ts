@@ -25,7 +25,8 @@ export function usePriceAlerts(): UsePriceAlertsReturn {
         body: JSON.stringify(data),
       });
       const json = (await res.json()) as { message?: string };
-      if (!res.ok) throw new Error(json?.message ?? `Request failed: ${res.status}`);
+      if (!res.ok)
+        throw new Error(json?.message ?? `Request failed: ${res.status}`);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create alert");

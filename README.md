@@ -17,14 +17,14 @@ thrifty-flight-agent/
 
 **Key choices:**
 
-| Concern | Technology |
-|---|---|
-| AI orchestration | LangChain (`createToolCallingAgent`) + GPT-4o |
-| Flight data | SerpAPI Google Flights engine |
-| Caching | Redis (falls back to in-memory if Redis is unavailable) |
-| Database | PostgreSQL via TypeORM (SQLite for tests) |
-| Charts | Recharts (`AreaChart`) |
-| Monorepo | Turborepo + pnpm workspaces |
+| Concern          | Technology                                              |
+| ---------------- | ------------------------------------------------------- |
+| AI orchestration | LangChain (`createToolCallingAgent`) + GPT-4o           |
+| Flight data      | SerpAPI Google Flights engine                           |
+| Caching          | Redis (falls back to in-memory if Redis is unavailable) |
+| Database         | PostgreSQL via TypeORM (SQLite for tests)               |
+| Charts           | Recharts (`AreaChart`)                                  |
+| Monorepo         | Turborepo + pnpm workspaces                             |
 
 ---
 
@@ -83,6 +83,7 @@ The web UI is served at <http://localhost:80>.
 Runs the LangChain agent against the conversation history. The agent decides whether to call the `search_flights` tool based on the user's message.
 
 **Request body**
+
 ```json
 {
   "messages": [
@@ -92,6 +93,7 @@ Runs the LangChain agent against the conversation history. The agent decides whe
 ```
 
 **Response**
+
 ```json
 {
   "message": "Here are the best options I found…",

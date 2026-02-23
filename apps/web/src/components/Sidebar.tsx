@@ -12,13 +12,24 @@ interface SidebarProps {
 function relativeLabel(isoString: string): string {
   const date = new Date(isoString);
   const diffDays = Math.floor((Date.now() - date.getTime()) / 86_400_000);
-  if (diffDays === 0) return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  if (diffDays === 0)
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return `${diffDays} days ago`;
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export function Sidebar({ sessions, activeId, onNew, onSwitch, onDelete, onClose }: SidebarProps) {
+export function Sidebar({
+  sessions,
+  activeId,
+  onNew,
+  onSwitch,
+  onDelete,
+  onClose,
+}: SidebarProps) {
   const sorted = [...sessions].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );
@@ -51,7 +62,10 @@ export function Sidebar({ sessions, activeId, onNew, onSwitch, onDelete, onClose
       </div>
 
       {/* Session list */}
-      <nav className="flex-1 py-2 overflow-y-auto" aria-label="Previous conversations">
+      <nav
+        className="flex-1 py-2 overflow-y-auto"
+        aria-label="Previous conversations"
+      >
         {sorted.length === 0 ? (
           <p className="text-[0.8rem] text-app-text-subtle px-[0.85rem] py-4 m-0">
             No conversations yet.
@@ -59,7 +73,10 @@ export function Sidebar({ sessions, activeId, onNew, onSwitch, onDelete, onClose
         ) : (
           <ul className="list-none p-0 m-0 flex flex-col gap-px">
             {sorted.map((session) => (
-              <li key={session.id} className="relative flex items-stretch group">
+              <li
+                key={session.id}
+                className="relative flex items-stretch group"
+              >
                 <button
                   type="button"
                   className={`flex-1 min-w-0 flex flex-col items-start gap-[0.15rem] py-[0.6rem] pl-[0.85rem] pr-9 text-left border-none rounded-none cursor-pointer transition-colors ${
@@ -72,7 +89,9 @@ export function Sidebar({ sessions, activeId, onNew, onSwitch, onDelete, onClose
                 >
                   <span
                     className={`text-[0.8rem] font-medium truncate max-w-full ${
-                      session.id === activeId ? "text-app-accent" : "text-app-text"
+                      session.id === activeId
+                        ? "text-app-accent"
+                        : "text-app-text"
                     }`}
                   >
                     {session.title}
@@ -84,7 +103,10 @@ export function Sidebar({ sessions, activeId, onNew, onSwitch, onDelete, onClose
                 <button
                   type="button"
                   className="absolute right-[0.4rem] top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-[5px] border-none bg-transparent text-app-text-subtle cursor-pointer opacity-0 group-hover:opacity-100 transition-all hover:bg-app-red/15 hover:text-app-red hover:opacity-100"
-                  onClick={(e) => { e.stopPropagation(); onDelete(session.id); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(session.id);
+                  }}
                   aria-label={`Delete "${session.title}"`}
                   title="Delete"
                 >
@@ -101,15 +123,34 @@ export function Sidebar({ sessions, activeId, onNew, onSwitch, onDelete, onClose
 
 function PlusIcon() {
   return (
-    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    <svg
+      className="w-3.5 h-3.5 shrink-0"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   );
 }
 
 function ChevronLeftIcon() {
   return (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      className="w-4 h-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <polyline points="15 18 9 12 15 6" />
     </svg>
   );
@@ -117,7 +158,16 @@ function ChevronLeftIcon() {
 
 function TrashIcon() {
   return (
-    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      className="w-3 h-3"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
       <path d="M10 11v6M14 11v6" />

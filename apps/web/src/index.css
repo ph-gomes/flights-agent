@@ -3,33 +3,45 @@
 
 /* ─── Design tokens ──────────────────────────────────────────────────────────── */
 @theme {
-  --color-app-bg:           #0f0f13;
-  --color-app-surface:      #1a1a20;
-  --color-app-surface-2:    #22222a;
-  --color-app-border:       #2e2e38;
-  --color-app-border-sub:   #252530;
-  --color-app-accent:       #a78bfa;
+  --color-app-bg: #0f0f13;
+  --color-app-surface: #1a1a20;
+  --color-app-surface-2: #22222a;
+  --color-app-border: #2e2e38;
+  --color-app-border-sub: #252530;
+  --color-app-accent: #a78bfa;
   --color-app-accent-hover: #8b5cf6;
-  --color-app-text:         #f0f0f4;
-  --color-app-text-muted:   #8b8b9a;
-  --color-app-text-subtle:  #55555f;
-  --color-app-green:        #34d399;
-  --color-app-red:          #f87171;
-  --color-app-yellow:       #fbbf24;
+  --color-app-text: #f0f0f4;
+  --color-app-text-muted: #8b8b9a;
+  --color-app-text-subtle: #55555f;
+  --color-app-green: #34d399;
+  --color-app-red: #f87171;
+  --color-app-yellow: #fbbf24;
 
   --animate-shimmer: shimmer 1.6s infinite linear;
-  --animate-typing:  typing-bounce 1.2s ease-in-out infinite;
+  --animate-typing: typing-bounce 1.2s ease-in-out infinite;
 }
 
 /* ─── Keyframes ──────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position:  400px 0; }
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
 }
 
 @keyframes typing-bounce {
-  0%, 80%, 100% { transform: translateY(0);    opacity: 0.4; }
-  40%           { transform: translateY(-4px); opacity: 1;   }
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────────── */
@@ -58,5 +70,9 @@ body {
 }
 
 /* ─── Typing-dot stagger (nth-child can't be expressed with Tailwind alone) ──── */
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}

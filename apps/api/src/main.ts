@@ -2,7 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
-const LOG_LEVELS = ['fatal', 'error', 'warn', 'log', 'debug', 'verbose'] as const;
+const LOG_LEVELS = [
+  'fatal',
+  'error',
+  'warn',
+  'log',
+  'debug',
+  'verbose',
+] as const;
 
 function toLogLevels(level: string): (typeof LOG_LEVELS)[number][] {
   const normalized = level.toLowerCase();

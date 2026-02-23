@@ -1,4 +1,1 @@
-export type {
-  PriceHistoryRecord,
-  PriceHistoryResponse,
-} from "@repo/types";
+export type { PriceHistoryRecord, PriceHistoryResponse } from "@repo/types";

@@ -92,7 +92,7 @@ export interface FlightSearchResult {
 // ─── Chat ────────────────────────────────────────────────────────────────────
 
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   content: string;
 }
 
@@ -103,7 +103,7 @@ export interface ChatResponse {
 
 // ─── Price Alerts ────────────────────────────────────────────────────────────
 
-export type PriceAlertStatus = 'active' | 'triggered' | 'expired';
+export type PriceAlertStatus = "active" | "triggered" | "expired";
 
 export interface PriceAlert {
   id: string;

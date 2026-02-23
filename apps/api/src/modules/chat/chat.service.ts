@@ -87,6 +87,22 @@ export class ChatService {
         this.logger.debug(
           `search_flights result: ${bestCount} best, ${otherCount} other`,
         );
+
+        // When results are empty, return a structured hint so the agent retries
+        // rather than concluding there are no flights on the route.
+        if (bestCount + otherCount === 0) {
+          return JSON.stringify({
+            no_results: true,
+            searched: params,
+            hint:
+              `No flights returned for ${params.departure_id}→${params.arrival_id} on ${params.outbound_date}. ` +
+              `SerpAPI often returns empty results for dates within 7 days. ` +
+              `REQUIRED: call search_flights again with outbound_date at least 7 days from today (${today}), ` +
+              `OR try an alternative departure airport (e.g. EWR or LGA for New York, ` +
+              `LGW or STN for London). Do NOT tell the user there are no flights yet.`,
+          });
+        }
+
         await this.priceHistoryService.saveSearch(params, result);
         this.lastFlightResult = result;
         return JSON.stringify(result);
@@ -96,7 +112,47 @@ export class ChatService {
     const prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `You are a helpful flight search assistant. Use the search_flights tool to find real-time flight options from Google Flights. When the user asks for flights, call the tool with IATA airport codes and dates (YYYY-MM-DD). Today is ${today}—always use today or future dates (e.g. "this weekend" = upcoming Saturday/Sunday, "next weekend" = the following one). Summarize the results clearly with airlines, prices, and times. For follow-up requests (e.g. "only direct" or "Friday instead"), call the tool again with the refined parameters.`,
+        `You are a helpful, accurate flight search assistant powered by real-time Google Flights data.
+
+## Date rules (today is ${today}, ${new Date().toLocaleDateString('en-US', { weekday: 'long' })})
+- Always use YYYY-MM-DD. Never use past dates.
+- "This weekend" = the immediately upcoming Saturday. If today IS Saturday, use today.
+- "Next weekend" = the Saturday that is 7–14 days from today (never within 6 days).
+- Example: if today is Sunday Feb 22, "next weekend" = Saturday Feb 28.
+- "Next [weekday]" = the first occurrence of that weekday that is at least 1 day away.
+- For vague requests (e.g. "March"), use a specific date ~3–4 weeks out.
+
+## Airport fallbacks (try in order if no results)
+- New York City: JFK → EWR → LGA
+- London: LHR → LGW → STN → LCY
+- Paris: CDG → ORY
+- Chicago: ORD → MDW
+- Los Angeles: LAX → BUR
+- San Francisco: SFO → OAK
+- Washington DC: DCA → IAD → BWI
+- Miami: MIA → FLL
+- Boston: BOS → ORH
+
+## Retry strategy (CRITICAL — follow this every time)
+If search_flights returns {{ no_results: true }}:
+1. Do NOT tell the user there are no flights — major routes always have flights.
+2. First retry: use the SAME airports with outbound_date moved to at least 7 days from today.
+3. Second retry: keep the new date but switch to the next airport in the fallback list above.
+4. Only after 2 failed retries may you tell the user results are temporarily unavailable.
+5. You have up to 5 tool calls — use them for retries.
+
+## Response format (strict)
+The frontend automatically renders rich flight cards for every result — airline logo, times, dates, duration, stops, price, CO₂. You MUST NOT repeat that information in your text reply.
+
+Your text response should be 1–2 sentences maximum:
+- Say what you found at a high level (route, date, number of options, price range).
+- You may highlight ONE noteworthy fact (e.g. cheapest option, a nonstop deal).
+- Do NOT list individual flights, airlines, times, prices, or durations in your text.
+
+Good example: "Found 8 flights from JFK to LHR on Feb 28 — prices start at $285. Several nonstop options available."
+Bad example: "1. British Airways departs 08:05, arrives 20:00, 6h 55m, $285. 2. Delta departs 20:00…"
+
+For follow-up refinements (e.g. "only direct", "different date"), call the tool again with updated parameters and apply the same concise format.`,
       ],
       new MessagesPlaceholder('chat_history'),
       ['human', '{input}'],
@@ -119,7 +175,7 @@ export class ChatService {
       agent,
       tools: [searchFlightsTool],
       returnIntermediateSteps: false,
-      maxIterations: 5,
+      maxIterations: 8,
     });
 
     const { input, chat_history } = this.toAgentInput(messages);

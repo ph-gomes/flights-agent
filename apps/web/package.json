@@ -10,11 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@repo/types": "workspace:*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.0.0",
-    "remark-gfm": "^4.0.0",
-    "@repo/types": "workspace:*"
+    "recharts": "^3.7.0",
+    "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

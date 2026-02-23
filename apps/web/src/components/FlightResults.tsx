@@ -1,4 +1,5 @@
 import type { FlightSearchResponse, FlightOption } from "../types/chat";
+import { FlightOptionCard } from "./FlightOptionCard";
 
 interface FlightResultsProps {
   data: FlightSearchResponse | null | undefined;
@@ -9,61 +10,63 @@ function formatPrice(price: number | undefined): string {
   return `$${price.toLocaleString()}`;
 }
 
-function routeLabel(flight: FlightOption): string {
-  const from = flight.departure_airport?.name ?? "—";
-  const to = flight.arrival_airport?.name ?? "—";
-  return `${from} → ${to}`;
-}
-
 export function FlightResults({ data }: FlightResultsProps) {
   if (!data) return null;
 
-  const best = data.best_flights ?? [];
-  const other = data.other_flights ?? [];
+  const best: FlightOption[] = data.best_flights ?? [];
+  const other: FlightOption[] = data.other_flights ?? [];
   const all = best.length > 0 ? best : other;
   if (all.length === 0) return null;
 
-  const lowestPrice = data.price_insights?.lowest_price;
+  const lowestFromInsights = data.price_insights?.lowest_price;
+  const prices = all
+    .map((f) => f.price)
+    .filter((p): p is number => p != null && Number.isFinite(p));
+  const lowestPrice =
+    lowestFromInsights != null && Number.isFinite(lowestFromInsights)
+      ? lowestFromInsights
+      : prices.length > 0
+        ? Math.min(...prices)
+        : undefined;
+
+  const priceLevel = data.price_insights?.price_level;
 
   return (
     <section className="flight-results" aria-label="Flight options">
-      <h3>Flight options</h3>
-      {lowestPrice != null && Number.isFinite(lowestPrice) && (
-        <p className="flight-results-summary">
-          Lowest from search: <strong>{formatPrice(lowestPrice)}</strong>
-        </p>
-      )}
-      <ul className="flight-list">
+      <div className="flight-results-meta">
+        <h3 className="flight-results-title">
+          {all.length} flight{all.length !== 1 ? "s" : ""} found
+        </h3>
+        <div className="flight-results-insights">
+          {lowestPrice != null && Number.isFinite(lowestPrice) && (
+            <span className="flight-results-lowest">
+              From <strong>{formatPrice(lowestPrice)}</strong>
+            </span>
+          )}
+          {priceLevel && (
+            <span
+              className={`flight-results-price-level frl-${priceLevel.toLowerCase().replace(/\s+/g, "-")}`}
+            >
+              {priceLevel}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flight-cards">
         {all.slice(0, 10).map((flight, i) => (
-          <li key={i} className="flight-card">
-            <div className="flight-card-route" title={routeLabel(flight)}>
-              {routeLabel(flight)}
-            </div>
-            <div className="flight-card-header">
-              <span className="flight-airline">{flight.airline ?? "—"}</span>
-              <span className="flight-price">{formatPrice(flight.price)}</span>
-            </div>
-            <div className="flight-card-body">
-              {flight.outbound_duration && (
-                <span className="flight-detail">Outbound: {flight.outbound_duration}</span>
-              )}
-              {flight.return_duration && (
-                <span className="flight-detail">Return: {flight.return_duration}</span>
-              )}
-              {flight.flights?.length ? (
-                <div className="flight-legs">
-                  {flight.flights.map((leg, j) => (
-                    <span key={j} className="flight-leg">
-                      {leg.departure_airport?.name ?? "—"} → {leg.arrival_airport?.name ?? "—"}
-                      {leg.duration != null ? ` (${leg.duration}m)` : ""}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </li>
+          <FlightOptionCard
+            key={i}
+            flight={flight}
+            isCheapest={
+              lowestPrice != null &&
+              flight.price != null &&
+              Number.isFinite(flight.price) &&
+              flight.price === lowestPrice
+            }
+          />
         ))}
-      </ul>
+      </div>
     </section>
   );
 }

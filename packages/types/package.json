@@ -1,10 +1,13 @@
 {
   "name": "@repo/types",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Shared TypeScript interfaces for Thrifty Flight Agent",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "check-types": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",

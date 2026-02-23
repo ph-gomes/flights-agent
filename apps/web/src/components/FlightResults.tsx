@@ -26,12 +26,14 @@ function FlightCardList({
   lowestPrice,
   onSetAlert,
   onSelectOutbound,
+  onSelectFlight,
   max = 10,
 }: {
   flights: FlightOption[];
   lowestPrice: number | undefined;
   onSetAlert?: (target: AlertTarget) => void;
   onSelectOutbound?: (flight: FlightOption) => void;
+  onSelectFlight?: (flight: FlightOption) => void;
   max?: number;
 }) {
   return (
@@ -49,6 +51,9 @@ function FlightCardList({
           onSetAlert={onSetAlert}
           onSelectOutbound={
             onSelectOutbound ? () => onSelectOutbound(flight) : undefined
+          }
+          onSelectFlight={
+            onSelectFlight ? () => onSelectFlight(flight) : undefined
           }
         />
       ))}
@@ -68,13 +73,28 @@ export function FlightResults({
   const [returnOptions, setReturnOptions] =
     useState<FlightSearchResponse | null>(null);
   const [loadingReturn, setLoadingReturn] = useState(false);
+  const [selectedReturn, setSelectedReturn] = useState<FlightOption | null>(
+    null,
+  );
+  const [returnOptionError, setReturnOptionError] = useState<string | null>(
+    null,
+  );
 
   const loadReturnOptions = useCallback(
     async (flight: FlightOption) => {
       const token = flight.departure_token;
-      if (!token || !returnDate) return;
+      if (!returnDate) return;
+      if (!token) {
+        setReturnOptionError(
+          "Return options aren't available for this option. Try another outbound flight.",
+        );
+        setTimeout(() => setReturnOptionError(null), 5000);
+        return;
+      }
+      setReturnOptionError(null);
       setSelectedOutbound(flight);
       setReturnOptions(null);
+      setSelectedReturn(null);
       setLoadingReturn(true);
       try {
         const params = new URLSearchParams({
@@ -202,6 +222,13 @@ export function FlightResults({
         />
       )}
 
+      {/* Error when outbound has no departure_token */}
+      {isOutboundMode && returnOptionError && (
+        <div className="mt-3 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[0.82rem] text-amber-200">
+          {returnOptionError}
+        </div>
+      )}
+
       {/* Return flights (step 2) */}
       {isOutboundMode && selectedOutbound && (
         <div className="mt-4 pt-4 border-t border-app-border">
@@ -214,6 +241,7 @@ export function FlightResults({
               onClick={() => {
                 setSelectedOutbound(null);
                 setReturnOptions(null);
+                setSelectedReturn(null);
               }}
               className="text-[0.8rem] font-medium text-app-text-muted hover:text-app-accent"
             >
@@ -222,10 +250,73 @@ export function FlightResults({
           </div>
           {loadingReturn && <SkeletonResults />}
           {!loadingReturn && returnOptions && (
-            <FlightResults
-              data={returnOptions}
-              onSetAlert={onSetAlert}
-            />
+            <>
+              {selectedReturn ? (
+                <div className="rounded-xl border border-app-accent bg-app-accent/10 px-4 py-3 text-[0.9rem]">
+                  <p className="font-semibold text-app-accent m-0 mb-1">
+                    Return flight selected
+                  </p>
+                  <p className="text-app-text-muted m-0 text-[0.82rem]">
+                    Return leg {formatPrice(selectedReturn.price)}. Change
+                    outbound above to pick different return options.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {(() => {
+                    const retBest =
+                      returnOptions.best_flights ?? [];
+                    const retOther =
+                      returnOptions.other_flights ?? [];
+                    const retAll = [...retBest, ...retOther];
+                    const retPrices = retAll
+                      .map((f) => f.price)
+                      .filter(
+                        (p): p is number =>
+                          p != null && Number.isFinite(p),
+                      );
+                    const retLowest =
+                      retPrices.length > 0
+                        ? Math.min(...retPrices)
+                        : undefined;
+                    return (
+                      <div className="flex flex-col border border-app-border rounded-xl overflow-hidden">
+                        {retBest.map((flight, i) => (
+                          <FlightOptionCard
+                            key={`best-${i}`}
+                            flight={flight}
+                            isCheapest={
+                              retLowest != null &&
+                              flight.price != null &&
+                              flight.price === retLowest
+                            }
+                            onSetAlert={onSetAlert}
+                            onSelectFlight={() =>
+                              setSelectedReturn(flight)
+                            }
+                          />
+                        ))}
+                        {retOther.map((flight, i) => (
+                          <FlightOptionCard
+                            key={`other-${i}`}
+                            flight={flight}
+                            isCheapest={
+                              retLowest != null &&
+                              flight.price != null &&
+                              flight.price === retLowest
+                            }
+                            onSetAlert={onSetAlert}
+                            onSelectFlight={() =>
+                              setSelectedReturn(flight)
+                            }
+                          />
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </>
           )}
         </div>
       )}

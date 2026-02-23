@@ -8,6 +8,8 @@ export interface FlightOptionCardProps {
   onSetAlert?: (target: AlertTarget) => void;
   /** When set and flight has departure_token, shows "Select outbound" for return-options flow. */
   onSelectOutbound?: () => void;
+  /** When set, enables "Select return flight" (or "Select flight") to complete round-trip choice. */
+  onSelectFlight?: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -248,6 +250,7 @@ export function FlightOptionCard({
   isCheapest,
   onSetAlert,
   onSelectOutbound,
+  onSelectFlight,
 }: FlightOptionCardProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -361,8 +364,7 @@ export function FlightOptionCard({
           )}
         </div>
 
-        {/* Select outbound (round-trip step 1) */}
-        {onSelectOutbound && flight.departure_token && (
+        {onSelectOutbound && (
           <div className="flex flex-none items-center shrink-0">
             <button
               type="button"
@@ -373,6 +375,22 @@ export function FlightOptionCard({
               className="px-3 py-1.5 text-[0.78rem] font-semibold rounded-lg border-2 border-app-accent bg-app-accent/10 text-app-accent cursor-pointer whitespace-nowrap transition-all hover:bg-app-accent hover:text-white"
             >
               Select outbound
+            </button>
+          </div>
+        )}
+
+        {/* Select return flight (round-trip step 2) */}
+        {onSelectFlight && (
+          <div className="flex flex-none items-center shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectFlight();
+              }}
+              className="px-3 py-1.5 text-[0.78rem] font-semibold rounded-lg border-2 border-app-accent bg-app-accent/10 text-app-accent cursor-pointer whitespace-nowrap transition-all hover:bg-app-accent hover:text-white"
+            >
+              Select return
             </button>
           </div>
         )}
@@ -428,12 +446,15 @@ export function FlightOptionCard({
                   🔔 Set Alert
                 </button>
               )}
-              <button
-                type="button"
-                className="px-5 py-2 text-[0.85rem] font-semibold rounded-lg border-2 border-app-accent bg-transparent text-app-accent cursor-pointer shrink-0 transition-all hover:bg-app-accent hover:text-white"
-              >
-                Select flight
-              </button>
+              {onSelectFlight && (
+                <button
+                  type="button"
+                  onClick={onSelectFlight}
+                  className="px-5 py-2 text-[0.85rem] font-semibold rounded-lg border-2 border-app-accent bg-transparent text-app-accent cursor-pointer shrink-0 transition-all hover:bg-app-accent hover:text-white"
+                >
+                  Select return
+                </button>
+              )}
             </div>
           </div>
         </div>

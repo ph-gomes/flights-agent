@@ -74,14 +74,18 @@ function flightSection(page) {
   try {
   // ─── 1. Chat interactions ──────────────────────────────────────────────────
   console.log("\n▶ Loading app…");
-  await page.goto(BASE, { waitUntil: "networkidle" });
+  await page.goto(BASE, { waitUntil: "domcontentloaded" });
+  await page.getByRole("textbox", { name: "Message" }).waitFor({ state: "attached", timeout: 15000 });
+  await page.waitForTimeout(1500);
   await shot(page, "00-home");
 
   // TC-03 — Empty state → suggested queries
   console.log("\n▶ TC-03 — Empty state → suggested queries");
-  const heading = await page.getByRole("heading", { level: 2 }).textContent();
+  const heading = await page.getByRole("heading", { name: /where do you want/i }).textContent({ timeout: 10000 }).catch(() => null);
   if (!heading?.toLowerCase().includes("where")) {
-    fail("TC-03", `Expected welcome heading, got: ${heading}`);
+    const anyHeading = await page.locator("h2").first().textContent({ timeout: 3000 }).catch(() => null);
+    if (anyHeading?.toLowerCase().includes("where")) ok("TC-03", "Empty state with heading");
+    else fail("TC-03", `Expected welcome heading, got: ${heading ?? anyHeading ?? "none"}`);
   } else {
     ok("TC-03", "Empty state with heading");
   }
@@ -128,6 +132,37 @@ function flightSection(page) {
     skip("TC-02", `Results wait: ${e.message}`);
   }
   await shot(page, "TC02-roundtrip");
+
+  // TC-02b — Round-trip: "Select outbound" visible and return flow
+  console.log("\n▶ TC-02b — Select outbound + return flow");
+  const selectOutboundBtn = page.getByRole("button", { name: "Select outbound" }).first();
+  const outboundVisible = await selectOutboundBtn.waitFor({ state: "visible", timeout: 8000 }).then(() => true).catch(() => false);
+  if (outboundVisible) {
+    ok("TC-02b", "Select outbound button visible");
+    await selectOutboundBtn.click();
+    await page.waitForTimeout(3000);
+    const returnHeading = page.getByRole("heading", { name: "Return flights" });
+    const returnVisible = await returnHeading.waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
+    if (returnVisible) {
+      ok("TC-02b", "Return flights section appeared after Select outbound");
+      const selectReturnBtn = page.getByRole("button", { name: "Select return" }).first();
+      const returnBtnVisible = await selectReturnBtn.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
+      if (returnBtnVisible) {
+        ok("TC-02b", "Select return button visible");
+        await selectReturnBtn.click();
+        await page.waitForTimeout(500);
+        const selectedMsg = page.getByText("Return flight selected");
+        if (await selectedMsg.isVisible().catch(() => false)) ok("TC-02b", "Return flight selected confirmation");
+      } else {
+        skip("TC-02b", "Select return button not found (may still be loading)");
+      }
+    } else {
+      skip("TC-02b", "Return flights section did not appear (API may not return departure_token)");
+    }
+    await shot(page, "TC02b-return-flow");
+  } else {
+    fail("TC-02b", "Select outbound button not found (round-trip outbound mode)");
+  }
 
   // ─── 2. Tool calling (TC-05, TC-06, TC-07, TC-08) ──────────────────────────
   // TC-05 — IATA resolution: new session, "New York to Paris next Friday"

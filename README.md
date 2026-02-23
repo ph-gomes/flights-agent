@@ -15,6 +15,8 @@ thrifty-flight-agent/
     └── types/        Shared TypeScript interfaces (consumed by both apps)
 ```
 
+The frontend uses **React with Vite** (not Next.js) for fast dev feedback and simple deployment.
+
 **Key choices:**
 
 | Concern          | Technology                                              |

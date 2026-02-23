@@ -33,6 +33,6 @@ export class PriceAlertEntity {
   @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   triggeredAt: Date | null;
 }

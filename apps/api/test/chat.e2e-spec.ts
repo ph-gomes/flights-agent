@@ -74,15 +74,16 @@ describe('ChatController (e2e) – happy path', () => {
         });
     });
 
-    it('returns 200 with fallback message when body has no messages array', () => {
+    it('returns 400 with validation error when body has no messages array', () => {
       return request(app.getHttpServer() as Server)
         .post('/chat')
         .send({})
-        .expect(201)
+        .expect(400)
         .expect((res) => {
-          const body = res.body as ChatResponseBody;
+          const body = res.body as { message?: string | string[]; error?: string };
           expect(body).toHaveProperty('message');
-          expect(body.message).toContain('provide');
+          const msg = Array.isArray(body.message) ? body.message.join(' ') : body.message ?? '';
+          expect(msg).toMatch(/messages?|at least one/i);
         });
     });
   });

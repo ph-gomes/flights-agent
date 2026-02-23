@@ -77,7 +77,15 @@ export function useChatSessions(): UseChatSessionsReturn {
     readActiveId(readSessions()),
   );
 
-  const activeSession = sessions.find((s) => s.id === activeId) ?? null;
+  // Resolve a valid activeId during render instead of via an effect.
+  // If the stored activeId is no longer in sessions (deleted or corrupted storage)
+  // fall back to the first remaining session — no extra render triggered.
+  const resolvedActiveId =
+    activeId != null && sessions.some((s) => s.id === activeId)
+      ? activeId
+      : (sessions[0]?.id ?? null);
+
+  const activeSession = sessions.find((s) => s.id === resolvedActiveId) ?? null;
 
   // ── Create a new blank session and make it active ─────────────────────────
   const newSession = useCallback((): string => {
@@ -107,7 +115,7 @@ export function useChatSessions(): UseChatSessionsReturn {
       priceHistoryRoute?: { departure: string; arrival: string } | null,
       sessionIdOverride?: string,
     ) => {
-      const targetId = sessionIdOverride ?? activeId;
+      const targetId = sessionIdOverride ?? resolvedActiveId;
       if (!targetId) return;
       setSessions((prev) => {
         const next = prev.map((s) =>
@@ -128,7 +136,7 @@ export function useChatSessions(): UseChatSessionsReturn {
         return next;
       });
     },
-    [activeId],
+    [resolvedActiveId],
   );
 
   // ── Switch to a different session ─────────────────────────────────────────
@@ -140,24 +148,27 @@ export function useChatSessions(): UseChatSessionsReturn {
   // ── Delete a session ──────────────────────────────────────────────────────
   const deleteSession = useCallback(
     (id: string) => {
-      setSessions((prev) => {
-        const next = prev.filter((s) => s.id !== id);
-        writeSessions(next);
-        // If we deleted the active one, switch to the next available
-        if (activeId === id) {
-          const fallback = next[0]?.id ?? null;
-          setActiveId(fallback);
-          if (fallback) writeActiveId(fallback);
+      const nextSessions = sessions.filter((s) => s.id !== id);
+      writeSessions(nextSessions);
+      setSessions(nextSessions);
+
+      if (resolvedActiveId === id) {
+        const fallback = nextSessions[0]?.id ?? null;
+        setActiveId(fallback);
+        try {
+          if (fallback) localStorage.setItem(ACTIVE_KEY, fallback);
+          else localStorage.removeItem(ACTIVE_KEY);
+        } catch {
+          /* ignore */
         }
-        return next;
-      });
+      }
     },
-    [activeId],
+    [sessions, resolvedActiveId],
   );
 
   return {
     sessions,
-    activeId,
+    activeId: resolvedActiveId,
     activeSession,
     newSession,
     saveSession,

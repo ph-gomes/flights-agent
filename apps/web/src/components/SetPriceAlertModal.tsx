@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { usePriceAlerts } from "../hooks/usePriceAlerts";
+import { formatPrice } from "../utils/formatters";
 
 export interface AlertTarget {
   departureId: string;
@@ -90,7 +91,7 @@ export function SetPriceAlertModal({
                     {" "}
                     · currently{" "}
                     <strong className="text-app-text">
-                      ${target.currentPrice.toLocaleString()}
+                      {formatPrice(target.currentPrice)}
                     </strong>
                   </>
                 )}
@@ -117,7 +118,7 @@ export function SetPriceAlertModal({
                 <strong className="text-app-text">{email}</strong> when the
                 price drops to{" "}
                 <strong className="text-app-text">
-                  ${Number(targetPrice).toLocaleString()}
+                  {formatPrice(Number(targetPrice))}
                 </strong>{" "}
                 or below.
               </p>

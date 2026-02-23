@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import type { EngineParameters } from 'serpapi';
 import { FlightSearchService } from './flight-search.service';
 
@@ -6,24 +6,12 @@ import { FlightSearchService } from './flight-search.service';
 export class FlightSearchController {
   constructor(private readonly flightSearchService: FlightSearchService) {}
 
-  @Get('search')
-  searchFlight(@Query() query: EngineParameters) {
-    return this.flightSearchService.searchFlight(query);
-  }
-
   /**
-   * Fetch return-flight options for a round trip after the user selects an outbound flight.
-   * Does not invoke the LLM; called directly from the frontend with the chosen outbound departure_token.
+   * Search flights. With departure_id, arrival_id, outbound_date (and optional return_date) = initial search.
+   * With departure_token + outbound_date (+ same route/dates) = return-flight options for round trip.
    */
-  @Get('return-options')
-  getReturnOptions(
-    @Query('departure_token') departureToken: string,
-    @Query('return_date') returnDate?: string,
-  ) {
-    const token = departureToken?.trim();
-    if (!token) {
-      throw new BadRequestException('departure_token is required');
-    }
-    return this.flightSearchService.getReturnOptions(token, returnDate);
+  @Get('search')
+  searchFlight(@Query() query: EngineParameters & Record<string, string>) {
+    return this.flightSearchService.searchFlight(query);
   }
 }

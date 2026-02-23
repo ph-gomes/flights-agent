@@ -1,18 +1,20 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { ChatService, type ChatMessage } from './chat.service';
+import {
+  Body,
+  Controller,
+  Post,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
+import { ChatService } from './chat.service';
+import { ChatRequestDto } from './dto/chat-request.dto';
 
 @Controller('chat')
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post()
-  chat(@Body() body: { messages: ChatMessage[] }) {
-    if (!Array.isArray(body?.messages)) {
-      return {
-        message: 'Please provide a messages array.',
-        flightResults: null,
-      };
-    }
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  chat(@Body() body: ChatRequestDto) {
     return this.chatService.chat(body.messages);
   }
 }

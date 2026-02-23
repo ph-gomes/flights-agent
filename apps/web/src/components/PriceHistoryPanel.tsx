@@ -13,6 +13,7 @@ import type {
   PriceHistoryRecord,
   PriceHistoryResponse,
 } from "../types/price-history";
+import { formatPrice, formatFlightDate } from "../utils/formatters";
 
 interface PriceHistoryPanelProps {
   departureId: string;
@@ -25,15 +26,6 @@ interface ChartPoint {
   price: number;
   label: string;
   fullLabel: string;
-}
-
-function formatPrice(price: number) {
-  return `$${price.toLocaleString()}`;
-}
-
-function formatFlightDate(dateStr: string, opts: Intl.DateTimeFormatOptions) {
-  const safe = dateStr.length === 10 ? `${dateStr}T00:00:00` : dateStr;
-  return new Date(safe).toLocaleDateString("en-US", opts);
 }
 
 function buildChartData(records: PriceHistoryRecord[]): ChartPoint[] {

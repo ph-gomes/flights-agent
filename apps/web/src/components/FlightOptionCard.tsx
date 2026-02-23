@@ -1,6 +1,12 @@
 import { useState } from "react";
 import type { FlightOption, FlightLeg, LayoverInfo } from "../types/chat";
 import type { AlertTarget } from "./SetPriceAlertModal";
+import {
+  formatPrice,
+  formatDuration,
+  formatFlightDate,
+  formatTimeFromDateTime,
+} from "../utils/formatters";
 
 export interface FlightOptionCardProps {
   flight: FlightOption;
@@ -14,26 +20,9 @@ export interface FlightOptionCardProps {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatPrice(price: number | undefined) {
-  if (price == null || !Number.isFinite(price)) return "—";
-  return `$${price.toLocaleString()}`;
-}
-
-function formatDuration(minutes: number | undefined) {
-  if (minutes == null || !Number.isFinite(minutes)) return "—";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
-
-function extractTime(dt?: string) {
-  return dt ? (dt.split(" ").pop() ?? "—") : "—";
-}
-
-function extractDate(dt?: string) {
+function extractDate(dt: string | undefined): string {
   if (!dt) return "";
-  const [y, m, d] = (dt.split(" ")[0] ?? "").split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1).toLocaleDateString("en-US", {
+  return formatFlightDate(dt.split(" ")[0] ?? "", {
     month: "short",
     day: "numeric",
   });
@@ -95,7 +84,7 @@ function SegmentTimeline({
         {/* Departure */}
         <div className="flex flex-col items-end gap-[0.05rem] pt-0.5 pr-2">
           <span className="text-[0.82rem] font-bold text-app-text whitespace-nowrap">
-            {extractTime(dep)}
+            {formatTimeFromDateTime(dep)}
           </span>
           <span className="text-[0.65rem] text-app-text-muted">
             {extractDate(dep)}
@@ -148,7 +137,7 @@ function SegmentTimeline({
         {/* Arrival */}
         <div className="flex flex-col items-end gap-[0.05rem] pt-0.5 pr-2">
           <span className="text-[0.82rem] font-bold text-app-text whitespace-nowrap">
-            {extractTime(arr)}
+            {formatTimeFromDateTime(arr)}
             {extraDays > 0 && (
               <sup className="text-[0.58rem] font-bold text-app-accent align-super ml-0.5">
                 +{extraDays}
@@ -243,6 +232,41 @@ function LeafIcon() {
   );
 }
 
+function ArrowRightIcon() {
+  return (
+    <svg
+      className="w-4 h-4 shrink-0"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      className="w-4 h-4 shrink-0"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function FlightOptionCard({
@@ -277,11 +301,21 @@ export function FlightOptionCard({
     <article
       className={`border-b border-app-border bg-app-surface-2 last:border-b-0 transition-[background] duration-[0.12s] ${expanded ? "" : "hover:bg-[#252530]"}`}
     >
-      {/* ── Summary row ── */}
-      <button
-        type="button"
-        className={`flex items-center w-full px-4 py-3 max-[620px]:px-3 max-[620px]:py-[0.65rem] bg-transparent border-none text-current cursor-pointer text-left transition-[background] duration-[0.12s] hover:bg-white/[0.03] ${expanded ? "bg-app-accent/[0.06]" : ""}`}
+      {/* ── Summary row ──
+           Using <div role="button"> instead of <button> because this row can
+           contain "Select outbound / Select return" <button> elements, and
+           nested <button> inside <button> is invalid HTML. */}
+      <div
+        role="button"
+        tabIndex={0}
+        className={`flex items-center w-full px-4 py-3 max-[620px]:px-3 max-[620px]:py-[0.65rem] cursor-pointer text-left transition-[background] duration-[0.12s] hover:bg-white/[0.03] ${expanded ? "bg-app-accent/[0.06]" : ""}`}
         onClick={() => setExpanded((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded((v) => !v);
+          }
+        }}
         aria-expanded={expanded}
         aria-label={`${carrierName}, ${stopsLabel(stops)}, ${formatDuration(flight.total_duration)}, ${formatPrice(flight.price)}. Click to ${expanded ? "collapse" : "expand"} details.`}
       >
@@ -297,13 +331,13 @@ export function FlightOptionCard({
         <div className="flex flex-col flex-none w-[140px] max-[620px]:w-[110px] justify-center gap-[0.15rem] shrink-0">
           <div className="flex items-baseline gap-1">
             <span className="text-[0.9rem] font-bold text-app-text whitespace-nowrap">
-              {extractTime(originDatetime)}
+              {formatTimeFromDateTime(originDatetime)}
             </span>
             <span className="text-[0.75rem] text-app-text-subtle" aria-hidden>
               —
             </span>
             <span className="text-[0.9rem] font-bold text-app-text whitespace-nowrap">
-              {extractTime(destDatetime)}
+              {formatTimeFromDateTime(destDatetime)}
               {routeExtraDays > 0 && (
                 <sup className="text-[0.58rem] font-bold text-app-accent align-super ml-0.5">
                   +{routeExtraDays}
@@ -365,32 +399,44 @@ export function FlightOptionCard({
         </div>
 
         {onSelectOutbound && (
-          <div className="flex flex-none items-center shrink-0">
+          <div className="flex flex-none items-center shrink-0 ml-2">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectOutbound();
               }}
-              className="px-3 py-1.5 text-[0.78rem] font-semibold rounded-lg border-2 border-app-accent bg-app-accent/10 text-app-accent cursor-pointer whitespace-nowrap transition-all hover:bg-app-accent hover:text-white"
+              className={
+                isCheapest
+                  ? "inline-flex items-center gap-2 px-4 py-2.5 text-[0.8rem] font-bold rounded-xl border-0 bg-app-accent text-white cursor-pointer whitespace-nowrap transition-all hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-app-accent focus:ring-offset-2 focus:ring-offset-app-bg"
+                  : "inline-flex items-center gap-2 px-4 py-2.5 text-[0.8rem] font-semibold rounded-xl border-2 border-app-accent bg-app-accent/10 text-app-accent cursor-pointer whitespace-nowrap transition-all hover:bg-app-accent hover:text-white focus:outline-none focus:ring-2 focus:ring-app-accent focus:ring-offset-2 focus:ring-offset-app-bg"
+              }
+              aria-label={`Select this outbound flight${flight.price != null ? ` for ${formatPrice(flight.price)}` : ""}`}
             >
-              Select outbound
+              <span>Select outbound</span>
+              <ArrowRightIcon />
             </button>
           </div>
         )}
 
         {/* Select return flight (round-trip step 2) */}
         {onSelectFlight && (
-          <div className="flex flex-none items-center shrink-0">
+          <div className="flex flex-none items-center shrink-0 ml-2">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectFlight();
               }}
-              className="px-3 py-1.5 text-[0.78rem] font-semibold rounded-lg border-2 border-app-accent bg-app-accent/10 text-app-accent cursor-pointer whitespace-nowrap transition-all hover:bg-app-accent hover:text-white"
+              className={
+                isCheapest
+                  ? "inline-flex items-center gap-2 px-4 py-2.5 text-[0.8rem] font-bold rounded-xl border-0 bg-app-green text-app-bg cursor-pointer whitespace-nowrap transition-all hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-app-green focus:ring-offset-2 focus:ring-offset-app-bg"
+                  : "inline-flex items-center gap-2 px-4 py-2.5 text-[0.8rem] font-semibold rounded-xl border-2 border-app-green bg-app-green/15 text-app-green cursor-pointer whitespace-nowrap transition-all hover:bg-app-green hover:text-app-bg focus:outline-none focus:ring-2 focus:ring-app-green focus:ring-offset-2 focus:ring-offset-app-bg"
+              }
+              aria-label={`Select this return flight${flight.price != null ? ` for ${formatPrice(flight.price)}` : ""}`}
             >
-              Select return
+              <span>Select return</span>
+              <CheckIcon />
             </button>
           </div>
         )}
@@ -402,7 +448,7 @@ export function FlightOptionCard({
         >
           <ChevronIcon open={expanded} />
         </div>
-      </button>
+      </div>
 
       {/* ── Expanded detail panel ── */}
       {expanded && (
@@ -450,9 +496,10 @@ export function FlightOptionCard({
                 <button
                   type="button"
                   onClick={onSelectFlight}
-                  className="px-5 py-2 text-[0.85rem] font-semibold rounded-lg border-2 border-app-accent bg-transparent text-app-accent cursor-pointer shrink-0 transition-all hover:bg-app-accent hover:text-white"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-[0.85rem] font-semibold rounded-xl border-2 border-app-green bg-app-green/15 text-app-green cursor-pointer shrink-0 transition-all hover:bg-app-green hover:text-app-bg focus:outline-none focus:ring-2 focus:ring-app-green focus:ring-offset-2 focus:ring-offset-app-bg"
                 >
-                  Select return
+                  <span>Select return</span>
+                  <CheckIcon />
                 </button>
               )}
             </div>

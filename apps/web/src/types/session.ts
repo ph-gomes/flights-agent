@@ -1,4 +1,4 @@
-import type { FlightSearchResponse } from "./chat";
+import type { FlightSearchResponse, FlightOption } from "./chat";
 
 export interface SessionMessage {
   role: "user" | "assistant" | "system";
@@ -8,6 +8,10 @@ export interface SessionMessage {
   return_date?: string;
   /** Route (departure/arrival) for this block's price history; set when message has flight results. */
   priceHistoryRoute?: { departure: string; arrival: string } | null;
+  /** Persisted round-trip selection state so the UI restores after scroll / session switch. */
+  selectedOutbound?: FlightOption | null;
+  returnOptions?: FlightSearchResponse | null;
+  selectedReturn?: FlightOption | null;
 }
 
 export interface ChatSession {

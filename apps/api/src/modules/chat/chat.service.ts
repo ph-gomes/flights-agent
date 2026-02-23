@@ -21,8 +21,7 @@ export interface ChatMessage {
 export interface ChatResponse {
   message: string;
   flightResults: BaseResponse | null;
-  /** Set when round-trip search was done as outbound-only; frontend uses it for return-options API. */
-  return_date?: string;
+  return_date: string | null;
 }
 
 @Injectable()
@@ -52,7 +51,7 @@ export class ChatService {
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD for date resolution
     const searchFlightsTool = new DynamicStructuredTool({
       name: 'search_flights',
-      description: `Search for flights using Google Flights. Use IATA 3-letter airport codes (e.g. JFK, CDG, LHR) for departure_id and arrival_id. Dates in YYYY-MM-DD; outbound_date must be today or in the future (today is ${today}). type: 1 = round trip, 2 = one way. You can pass optional filters: adults/children, travel_class (1=economy,2=premium,3=business,4=first), stops (0=any,1=nonstop,2=1 or fewer,3=2 or fewer), max_price (USD), include_airlines or exclude_airlines (e.g. "DL" for Delta, "SKYTEAM"), outbound_times/return_times ("startHour,endHour" 0-23).`,
+      description: `Search for flights using Google Flights. Use IATA 3-letter airport codes (e.g. JFK, CDG, LHR) for departure_id and arrival_id. Dates in YYYY-MM-DD; outbound_date must be today or in the future (today is ${today}). For ROUND TRIP you MUST pass return_date (YYYY-MM-DD) so the frontend can show "Select outbound" and return flights; type will be set to 1 automatically when return_date is provided. For one way omit return_date. Optional: adults/children, travel_class (1=economy,2=premium,3=business,4=first), stops (0=any,1=nonstop,2=1 or fewer,3=2 or fewer), max_price (USD), include_airlines or exclude_airlines (e.g. "DL", "SKYTEAM"), outbound_times/return_times ("startHour,endHour" 0-23).`,
       schema: z.object({
         departure_id: z
           .string()
@@ -120,27 +119,18 @@ export class ChatService {
           ),
       }),
       func: async (args) => {
-        const isRoundTrip = args.type === 1 && args.return_date;
+        // SerpAPI: type=1 + return_date required for round trip; only then do results include departure_token.
+        const hasReturnDate = Boolean(args.return_date?.trim());
+        const type = hasReturnDate ? 1 : (args.type ?? 2);
+        const isRoundTrip = type === 1 && hasReturnDate;
         const params: Record<string, unknown> = {
+          ...args,
           departure_id: args.departure_id,
           arrival_id: args.arrival_id,
           outbound_date: args.outbound_date,
-          return_date: isRoundTrip ? undefined : (args.return_date ?? undefined),
-          type: isRoundTrip ? 2 : (args.type ?? 2),
+          return_date: hasReturnDate ? args.return_date : undefined,
+          type,
         };
-        if (args.adults != null) params.adults = args.adults;
-        if (args.children != null) params.children = args.children;
-        if (args.travel_class != null) params.travel_class = args.travel_class;
-        if (args.stops != null) params.stops = args.stops;
-        if (args.max_price != null) params.max_price = args.max_price;
-        if (args.outbound_times != null)
-          params.outbound_times = args.outbound_times;
-        if (args.return_times != null) params.return_times = args.return_times;
-        if (args.include_airlines != null)
-          params.include_airlines = args.include_airlines;
-        if (args.exclude_airlines != null)
-          params.exclude_airlines = args.exclude_airlines;
-        if (args.sort_by != null) params.sort_by = args.sort_by;
         this.logger.debug(
           `search_flights tool invoked: ${JSON.stringify(params)}`,
         );
@@ -172,7 +162,7 @@ export class ChatService {
 
         await this.priceHistoryService.saveSearch(params, result);
         this.lastFlightResult = result;
-        this.lastReturnDate = isRoundTrip ? args.return_date ?? null : null;
+        this.lastReturnDate = isRoundTrip ? (args.return_date ?? null) : null;
         return JSON.stringify(result);
       },
     });
@@ -243,7 +233,7 @@ For follow-up refinements (e.g. "only direct", "different date"), call the tool 
       agent,
       tools: [searchFlightsTool],
       returnIntermediateSteps: false,
-      maxIterations: 8,
+      maxIterations: 10,
     });
 
     const { input, chat_history } = this.toAgentInput(messages);
@@ -267,7 +257,7 @@ For follow-up refinements (e.g. "only direct", "different date"), call the tool 
     return {
       message,
       flightResults: this.lastFlightResult ?? null,
-      return_date: this.lastReturnDate ?? undefined,
+      return_date: this.lastReturnDate ?? null,
     };
   }
 

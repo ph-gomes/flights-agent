@@ -1,7 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { ChatResponse, FlightSearchResponse } from "./types/chat";
 import type { SessionMessage } from "./types/session";
-import { FlightResults } from "./components/FlightResults";
+import {
+  FlightResults,
+  type RoundTripSelection,
+} from "./components/FlightResults";
 import { MarkdownContent } from "./components/MarkdownContent";
 import { PriceHistoryPanel } from "./components/PriceHistoryPanel";
 import {
@@ -14,7 +17,7 @@ import { useChatSessions } from "./hooks/useChatSessions";
 
 const SUGGESTED_QUERIES = [
   "Flights from NYC to London next weekend",
-  "Cheapest round trip JFK → Paris in March",
+  "Round trip JFK → Paris in March",
   "Find a weekend getaway to Miami",
   "Direct flights from LAX to Tokyo in April",
   "NYC to Rome, one way, late March",
@@ -129,6 +132,17 @@ export default function App() {
     [input, loading, messages, activeId, newSession, saveSession],
   );
 
+  const updateMessageSelection = useCallback(
+    (msgIndex: number, selection: RoundTripSelection) => {
+      const next = messages.map((m, i) =>
+        i === msgIndex ? { ...m, ...selection } : m,
+      );
+      setMessages(next);
+      saveSession(next);
+    },
+    [messages, saveSession],
+  );
+
   const handleNewChat = useCallback(() => newSession(), [newSession]);
   const handleSwitchSession = useCallback(
     (id: string) => {
@@ -145,7 +159,9 @@ export default function App() {
           m.role === "assistant" &&
           m.priceHistoryRoute?.departure &&
           m.priceHistoryRoute?.arrival,
-      )?.priceHistoryRoute ?? activeSession?.priceHistoryRoute ?? null;
+      )?.priceHistoryRoute ??
+    activeSession?.priceHistoryRoute ??
+    null;
 
   const openPriceHistory = useCallback(
     (route?: { departure: string; arrival: string } | null) => {
@@ -248,7 +264,20 @@ export default function App() {
                         <FlightResults
                           data={m.flightResults}
                           returnDate={m.return_date}
+                          outboundRoute={m.priceHistoryRoute ?? undefined}
                           onSetAlert={setAlertTarget}
+                          initialSelection={
+                            m.return_date
+                              ? {
+                                  selectedOutbound: m.selectedOutbound ?? null,
+                                  returnOptions: m.returnOptions ?? null,
+                                  selectedReturn: m.selectedReturn ?? null,
+                                }
+                              : undefined
+                          }
+                          onSelectionChange={(sel) =>
+                            updateMessageSelection(i, sel)
+                          }
                         />
                         {m.priceHistoryRoute?.departure &&
                           m.priceHistoryRoute?.arrival && (

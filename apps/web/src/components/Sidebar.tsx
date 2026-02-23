@@ -1,4 +1,5 @@
 import type { ChatSession } from "../types/session";
+import { formatRelativeDate } from "../utils/formatters";
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -7,19 +8,6 @@ interface SidebarProps {
   onSwitch: (id: string) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
-}
-
-function relativeLabel(isoString: string): string {
-  const date = new Date(isoString);
-  const diffDays = Math.floor((Date.now() - date.getTime()) / 86_400_000);
-  if (diffDays === 0)
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays} days ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export function Sidebar({
@@ -97,7 +85,7 @@ export function Sidebar({
                     {session.title}
                   </span>
                   <span className="text-[0.7rem] text-app-text-subtle">
-                    {relativeLabel(session.updatedAt)}
+                    {formatRelativeDate(session.updatedAt)}
                   </span>
                 </button>
                 <button

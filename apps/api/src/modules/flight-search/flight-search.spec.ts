@@ -1,9 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
+import { BadGatewayException } from '@nestjs/common';
 import type { Cache } from '@nestjs/cache-manager';
 import { FlightSearchService } from './flight-search.service';
 import { SerpGoogleFlightResponseDto } from './dto/serp-google-flight-response.dto';
+
+// ─── Mock SerpAPI (no real HTTP calls) ──────────────────────────────────────
+
+const mockGetJson = jest.fn();
+jest.mock('serpapi', () => ({
+  getJson: (params: unknown): ReturnType<typeof mockGetJson> =>
+    mockGetJson(params),
+}));
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -74,6 +83,11 @@ describe('FlightSearchService', () => {
   let service: FlightSearchService;
   let cacheManager: Cache;
 
+  beforeEach(() => {
+    mockGetJson.mockReset();
+    mockGetJson.mockResolvedValue(MOCK_SERPAPI_RESPONSE);
+  });
+
   async function createService(
     cacheOverrides: Partial<Cache> = {},
     configOverrides: Record<string, string> = {},
@@ -119,28 +133,29 @@ describe('FlightSearchService', () => {
         get: jest.fn().mockResolvedValue(MOCK_SERPAPI_RESPONSE),
       });
 
-      const _searchSpy = jest
-        .spyOn(service, '_searchFlight')
-        .mockResolvedValue(MOCK_SERPAPI_RESPONSE);
-
       const result = await service.searchFlight(searchParams);
 
       expect(cacheManager.get).toHaveBeenCalledTimes(1);
-      expect(_searchSpy).not.toHaveBeenCalled();
+      expect(mockGetJson).not.toHaveBeenCalled();
       expect(result).toEqual(MOCK_SERPAPI_RESPONSE);
     });
 
     it('calls SerpAPI and stores result in cache on cache miss', async () => {
       await createService(); // get returns null by default
 
-      const _searchSpy = jest
-        .spyOn(service, '_searchFlight')
-        .mockResolvedValue(MOCK_SERPAPI_RESPONSE);
-
       const result = await service.searchFlight(searchParams);
 
       expect(cacheManager.get).toHaveBeenCalledTimes(1);
-      expect(_searchSpy).toHaveBeenCalledTimes(1);
+      expect(mockGetJson).toHaveBeenCalledTimes(1);
+      expect(mockGetJson).toHaveBeenCalledWith(
+        expect.objectContaining({
+          engine: 'google_flights',
+          departure_id: 'JFK',
+          arrival_id: 'CDG',
+          outbound_date: '2026-03-01',
+          api_key: 'test-serp-key',
+        }),
+      );
       expect(cacheManager.set).toHaveBeenCalledWith(
         expect.any(String),
         MOCK_SERPAPI_RESPONSE,
@@ -197,16 +212,14 @@ describe('FlightSearchService', () => {
       });
 
       const keys = (cacheManager.get as jest.Mock<unknown, [string]>).mock
-        .calls as [string][];
+        .calls;
       expect(keys[0][0]).not.toBe(keys[1][0]);
       expect(keys[0][0]).toMatch(/^[a-f0-9]{32}$/);
     });
 
-    it('omits return_date from cache key for one-way searches', async () => {
+    it('uses different cache keys when return_date is present vs absent (params shape differs)', async () => {
       await createService();
-      jest
-        .spyOn(service, '_searchFlight')
-        .mockResolvedValue(MOCK_SERPAPI_RESPONSE);
+      mockGetJson.mockResolvedValue(MOCK_SERPAPI_RESPONSE);
 
       await service.searchFlight({
         departure_id: 'JFK',
@@ -223,19 +236,14 @@ describe('FlightSearchService', () => {
       });
 
       const keys = (cacheManager.get as jest.Mock<unknown, [string]>).mock
-        .calls as [string][];
-      expect(keys[0][0]).toBe(keys[1][0]);
+        .calls;
+      expect(keys[0][0]).not.toBe(keys[1][0]);
     });
   });
 
   describe('_searchFlight (SerpAPI integration)', () => {
     it('passes the api_key and engine to serpapi getJson', async () => {
       await createService();
-
-      // Mock the inner serpapi call
-      const serpMock = jest
-        .spyOn(service, '_searchFlight')
-        .mockResolvedValue(MOCK_SERPAPI_RESPONSE);
 
       await service._searchFlight({
         engine: 'google_flights',
@@ -245,12 +253,49 @@ describe('FlightSearchService', () => {
         api_key: 'test-serp-key',
       });
 
-      expect(serpMock).toHaveBeenCalledWith(
+      expect(mockGetJson).toHaveBeenCalledWith(
         expect.objectContaining({
+          engine: 'google_flights',
           departure_id: 'JFK',
           arrival_id: 'LHR',
+          outbound_date: '2026-04-01',
+          api_key: 'test-serp-key',
         }),
       );
+    });
+  });
+
+  describe('searchFlight – error handling', () => {
+    const searchParams = {
+      departure_id: 'JFK',
+      arrival_id: 'CDG',
+      outbound_date: '2026-03-01',
+    };
+
+    it('throws BadGatewayException when SerpAPI fails (e.g. rate limit or network)', async () => {
+      await createService(); // cache miss
+      mockGetJson.mockRejectedValueOnce(new Error('Rate limit exceeded'));
+
+      const err: unknown = await service.searchFlight(searchParams).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(err).toBeInstanceOf(BadGatewayException);
+      expect((err as Error).message).toMatch(
+        /Flight search failed: Rate limit exceeded/,
+      );
+    });
+
+    it('throws BadGatewayException when SerpAPI returns network error', async () => {
+      await createService();
+      mockGetJson.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+      const err: unknown = await service.searchFlight(searchParams).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(err).toBeInstanceOf(BadGatewayException);
+      expect((err as Error).message).toMatch(/ECONNREFUSED/);
     });
   });
 });

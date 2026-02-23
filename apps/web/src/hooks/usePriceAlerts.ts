@@ -28,7 +28,7 @@ export function usePriceAlerts(): UsePriceAlertsReturn {
       if (!res.ok)
         throw new Error(json?.message ?? `Request failed: ${res.status}`);
       setSuccess(true);
-    } catch (err) {
+    } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create alert");
     } finally {
       setCreating(false);

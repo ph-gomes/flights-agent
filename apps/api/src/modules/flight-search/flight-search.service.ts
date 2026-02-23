@@ -1,9 +1,49 @@
+import { createHash } from 'node:crypto';
 import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BaseResponse, EngineParameters, getJson } from 'serpapi';
 import { SerpGoogleFlightResponseDto } from './dto/serp-google-flight-response.dto';
-import { NormalizedSearchParams } from './dto/normalized-search-params.dto';
+
+/**
+ * Generic normalizer for cache key payloads: omit null/undefined, coerce numbers, stringify the rest.
+ * Returns a plain object with sorted keys for stable serialization.
+ */
+function normalizeForCache(
+  obj: Record<string, unknown>,
+): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === 'object' && v !== null) {
+      out[k] = JSON.stringify(v);
+    } else if (typeof v === 'number' && !Number.isNaN(v)) {
+      out[k] = v;
+    } else if (
+      typeof v === 'string' &&
+      v.trim() !== '' &&
+      !Number.isNaN(Number(v))
+    ) {
+      out[k] = Number(v);
+    } else if (typeof v === 'boolean' || v === 'true' || v === 'false') {
+      out[k] = Boolean(v);
+    } else {
+      out[k] = String(v as any);
+    }
+  }
+  return out;
+}
+
+function cacheKeyFromObject(obj: Record<string, unknown>): string {
+  const normalized = normalizeForCache(obj);
+  const sorted = Object.keys(normalized)
+    .sort()
+    .reduce<Record<string, string | number | boolean>>((acc, k) => {
+      acc[k] = normalized[k];
+      return acc;
+    }, {});
+  return createHash('md5').update(JSON.stringify(sorted)).digest('hex');
+}
 
 @Injectable()
 export class FlightSearchService {
@@ -40,22 +80,6 @@ export class FlightSearchService {
     return response;
   }
 
-  /** Normalize params so cache key is stable across controller (string query) vs chat (number type). */
-  private normalizeParams(
-    parameters: EngineParameters,
-  ): NormalizedSearchParams {
-    const type = this.normalizeType(parameters.type);
-    return {
-      departure_id: String(parameters.departure_id ?? ''),
-      arrival_id: String(parameters.arrival_id ?? ''),
-      outbound_date: String(parameters.outbound_date ?? ''),
-      return_date: parameters.return_date
-        ? String(parameters.return_date)
-        : undefined,
-      type,
-    };
-  }
-
   private normalizeType(value: unknown): 1 | 2 {
     if (value === undefined) return 2;
     if (typeof value === 'string') return Number(value) === 1 ? 1 : 2;
@@ -63,17 +87,14 @@ export class FlightSearchService {
     return 2;
   }
 
-  async searchFlight(parameters: EngineParameters): Promise<BaseResponse> {
-    const normalized = this.normalizeParams(parameters);
-    const cacheKey = JSON.stringify({
-      departure_id: normalized.departure_id,
-      arrival_id: normalized.arrival_id,
-      outbound_date: normalized.outbound_date,
-      return_date: normalized.return_date,
-      type: normalized.type,
-    });
+  async searchFlight(
+    parameters: EngineParameters & Record<string, unknown>,
+  ): Promise<BaseResponse> {
+    const cacheKey = cacheKeyFromObject(
+      parameters as unknown as Record<string, unknown>,
+    );
     this.logger.debug(
-      `searchFlight params: ${normalized.departure_id} → ${normalized.arrival_id} ${normalized.outbound_date}`,
+      `searchFlight params: ${parameters.departure_id} → ${parameters.arrival_id} ${parameters.outbound_date}`,
     );
     const cachedData = await this.cacheManager.get(cacheKey);
     if (cachedData) {
@@ -81,9 +102,35 @@ export class FlightSearchService {
       return cachedData as BaseResponse;
     }
     this.logger.debug('searchFlight cache miss, calling API');
-    const data = await this._searchFlight(normalized);
+    const data = await this._searchFlight(parameters);
     await this.cacheManager.set(cacheKey, data);
     this.logger.debug('searchFlight result cached');
     return data;
+  }
+
+  /**
+   * Fetch return-flight options for a round trip after the user has selected an outbound flight.
+   * Uses the departure_token from the selected outbound option. Does not use cache.
+   */
+  async getReturnOptions(
+    departureToken: string,
+    returnDate?: string,
+  ): Promise<BaseResponse> {
+    this.logger.debug(
+      `getReturnOptions departure_token=${departureToken.slice(0, 20)}..., return_date=${returnDate ?? 'any'}`,
+    );
+    const params: Record<string, string> = {
+      engine: 'google_flights',
+      departure_token: departureToken,
+      api_key: this.apiKey,
+    };
+    if (returnDate) params.return_date = returnDate;
+    const response: SerpGoogleFlightResponseDto = await getJson(params);
+    const best = response?.best_flights?.length ?? 0;
+    const other = response?.other_flights?.length ?? 0;
+    this.logger.debug(
+      `getReturnOptions result: ${best} best_flights, ${other} other_flights`,
+    );
+    return response;
   }
 }

@@ -91,7 +91,7 @@ export class PriceAlertsService {
               `[SIMULATED EMAIL SENT]`,
           );
         }
-      } catch (err) {
+      } catch (err: unknown) {
         this.logger.warn(
           `Poll error for alert ${alert.id}: ${err instanceof Error ? err.message : String(err)}`,
         );

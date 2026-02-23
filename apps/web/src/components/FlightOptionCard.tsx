@@ -6,6 +6,8 @@ export interface FlightOptionCardProps {
   flight: FlightOption;
   isCheapest?: boolean;
   onSetAlert?: (target: AlertTarget) => void;
+  /** When set and flight has departure_token, shows "Select outbound" for return-options flow. */
+  onSelectOutbound?: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -245,6 +247,7 @@ export function FlightOptionCard({
   flight,
   isCheapest,
   onSetAlert,
+  onSelectOutbound,
 }: FlightOptionCardProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -357,6 +360,22 @@ export function FlightOptionCard({
             </span>
           )}
         </div>
+
+        {/* Select outbound (round-trip step 1) */}
+        {onSelectOutbound && flight.departure_token && (
+          <div className="flex flex-none items-center shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectOutbound();
+              }}
+              className="px-3 py-1.5 text-[0.78rem] font-semibold rounded-lg border-2 border-app-accent bg-app-accent/10 text-app-accent cursor-pointer whitespace-nowrap transition-all hover:bg-app-accent hover:text-white"
+            >
+              Select outbound
+            </button>
+          </div>
+        )}
 
         {/* Chevron */}
         <div

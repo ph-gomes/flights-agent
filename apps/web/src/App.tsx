@@ -15,6 +15,7 @@ import { useChatSessions } from "./hooks/useChatSessions";
 const SUGGESTED_QUERIES = [
   "Flights from NYC to London next weekend",
   "Cheapest round trip JFK → Paris in March",
+  "Find a weekend getaway to Miami",
   "Direct flights from LAX to Tokyo in April",
   "NYC to Rome, one way, late March",
 ];
@@ -33,14 +34,14 @@ export default function App() {
   const [messages, setMessages] = useState<SessionMessage[]>(
     () => activeSession?.messages ?? [],
   );
-  const [priceHistoryRoute, setPriceHistoryRoute] = useState<{
-    departure: string;
-    arrival: string;
-  } | null>(() => activeSession?.priceHistoryRoute ?? null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPriceHistory, setShowPriceHistory] = useState(false);
+  const [panelRoute, setPanelRoute] = useState<{
+    departure: string;
+    arrival: string;
+  } | null>(null);
   const [alertTarget, setAlertTarget] = useState<AlertTarget | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -55,22 +56,19 @@ export default function App() {
   useEffect(() => {
     if (prevActiveIdRef.current === activeId) return;
     prevActiveIdRef.current = activeId;
-    setMessages((activeSession?.messages as SessionMessage[]) ?? []);
-    setPriceHistoryRoute(activeSession?.priceHistoryRoute ?? null);
+    if (!loading) {
+      setMessages((activeSession?.messages as SessionMessage[]) ?? []);
+    }
     setInput("");
     setError(null);
     setShowPriceHistory(false);
-  }, [activeId, activeSession]);
-
-  useEffect(() => {
-    if (!activeId) newSession();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeId, activeSession, loading]);
 
   const sendMessage = useCallback(
     async (text?: string) => {
       const query = (text ?? input).trim();
       if (!query || loading) return;
-      if (!activeId) newSession();
+      const sessionId = activeId ?? newSession();
 
       const userMessage: SessionMessage = { role: "user", content: query };
       const nextMessages = [...messages, userMessage];
@@ -95,17 +93,9 @@ export default function App() {
         if (!res.ok)
           throw new Error(data?.message ?? `Request failed: ${res.status}`);
 
-        const assistantMessage: SessionMessage = {
-          role: "assistant",
-          content: data.message,
-          flightResults: data.flightResults ?? null,
-        };
-        const withReply = [...nextMessages, assistantMessage];
-        setMessages(withReply);
-
-        let newRoute = priceHistoryRoute;
-        if (data.flightResults) {
-          const fr = data.flightResults as FlightSearchResponse;
+        const fr = data.flightResults as FlightSearchResponse | null;
+        let messageRoute: { departure: string; arrival: string } | null = null;
+        if (fr) {
           const firstOpt = fr.best_flights?.[0] ?? fr.other_flights?.[0];
           if (firstOpt) {
             const segs = firstOpt.flights ?? [];
@@ -117,28 +107,26 @@ export default function App() {
               segs[segs.length - 1]?.arrival_airport?.id ??
               (firstOpt as { arrival_airport?: { id?: string } })
                 .arrival_airport?.id;
-            if (dep && arr) {
-              newRoute = { departure: dep, arrival: arr };
-              setPriceHistoryRoute(newRoute);
-            }
+            if (dep && arr) messageRoute = { departure: dep, arrival: arr };
           }
         }
-        saveSession(withReply, newRoute);
-      } catch (err) {
+        const assistantMessage: SessionMessage = {
+          role: "assistant",
+          content: data.message,
+          flightResults: data.flightResults ?? null,
+          return_date: data.return_date,
+          priceHistoryRoute: messageRoute,
+        };
+        const withReply = [...nextMessages, assistantMessage];
+        setMessages(withReply);
+        saveSession(withReply, undefined, sessionId);
+      } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Something went wrong");
       } finally {
         setLoading(false);
       }
     },
-    [
-      input,
-      loading,
-      messages,
-      activeId,
-      priceHistoryRoute,
-      newSession,
-      saveSession,
-    ],
+    [input, loading, messages, activeId, newSession, saveSession],
   );
 
   const handleNewChat = useCallback(() => newSession(), [newSession]);
@@ -149,7 +137,23 @@ export default function App() {
     },
     [switchSession],
   );
-  const openPriceHistory = useCallback(() => setShowPriceHistory(true), []);
+  const latestPriceHistoryRoute =
+    [...messages]
+      .reverse()
+      .find(
+        (m) =>
+          m.role === "assistant" &&
+          m.priceHistoryRoute?.departure &&
+          m.priceHistoryRoute?.arrival,
+      )?.priceHistoryRoute ?? activeSession?.priceHistoryRoute ?? null;
+
+  const openPriceHistory = useCallback(
+    (route?: { departure: string; arrival: string } | null) => {
+      setPanelRoute(route ?? latestPriceHistoryRoute);
+      setShowPriceHistory(true);
+    },
+    [latestPriceHistoryRoute],
+  );
   const closePriceHistory = useCallback(() => setShowPriceHistory(false), []);
 
   const hasFlightResults = messages.some(
@@ -243,8 +247,21 @@ export default function App() {
                       <div className="mt-2 w-full min-w-0">
                         <FlightResults
                           data={m.flightResults}
+                          returnDate={m.return_date}
                           onSetAlert={setAlertTarget}
                         />
+                        {m.priceHistoryRoute?.departure &&
+                          m.priceHistoryRoute?.arrival && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openPriceHistory(m.priceHistoryRoute!)
+                              }
+                              className="mt-2 text-[0.8rem] font-medium text-app-text-muted hover:text-app-accent transition-colors"
+                            >
+                              📈 Price history for this route
+                            </button>
+                          )}
                       </div>
                     )}
                   </>
@@ -317,14 +334,14 @@ export default function App() {
                   {q}
                 </button>
               ))}
-            {priceHistoryRoute && !isEmptyState && (
+            {latestPriceHistoryRoute && !isEmptyState && (
               <button
                 type="button"
-                onClick={openPriceHistory}
+                onClick={() => openPriceHistory()}
                 className={`${chipBase} border-app-accent text-app-accent bg-app-accent/15 hover:bg-app-accent/25`}
               >
-                📈 {priceHistoryRoute.departure} → {priceHistoryRoute.arrival}{" "}
-                price history
+                📈 {latestPriceHistoryRoute.departure} →{" "}
+                {latestPriceHistoryRoute.arrival} price history
               </button>
             )}
           </div>
@@ -372,16 +389,16 @@ export default function App() {
             aria-hidden
           />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[11] w-[min(560px,94vw)] max-h-[88vh] overflow-y-auto rounded-[14px]">
-            {priceHistoryRoute ? (
+            {panelRoute ? (
               <PriceHistoryPanel
-                departureId={priceHistoryRoute.departure}
-                arrivalId={priceHistoryRoute.arrival}
+                departureId={panelRoute.departure}
+                arrivalId={panelRoute.arrival}
                 onClose={closePriceHistory}
               />
             ) : (
               <PriceHistoryRouteForm
                 onLoad={(dep, arr) =>
-                  setPriceHistoryRoute({ departure: dep, arrival: arr })
+                  setPanelRoute({ departure: dep, arrival: arr })
                 }
                 onClose={closePriceHistory}
               />

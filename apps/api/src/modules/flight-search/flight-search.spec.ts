@@ -188,12 +188,18 @@ describe('FlightSearchService', () => {
         return_date: '2026-03-08',
         type: 1,
       });
+      await service.searchFlight({
+        departure_id: 'JFK',
+        arrival_id: 'CDG',
+        outbound_date: '2026-03-01',
+        return_date: '2026-03-09',
+        type: 1,
+      });
 
-      const key = (cacheManager.get as jest.Mock<unknown, [string]>).mock
-        .calls[0][0];
-      const parsed = JSON.parse(key) as Record<string, unknown>;
-      expect(parsed.return_date).toBe('2026-03-08');
-      expect(parsed.type).toBe(1);
+      const keys = (cacheManager.get as jest.Mock<unknown, [string]>).mock
+        .calls as [string][];
+      expect(keys[0][0]).not.toBe(keys[1][0]);
+      expect(keys[0][0]).toMatch(/^[a-f0-9]{32}$/);
     });
 
     it('omits return_date from cache key for one-way searches', async () => {
@@ -208,12 +214,17 @@ describe('FlightSearchService', () => {
         outbound_date: '2026-03-01',
         type: 2,
       });
+      await service.searchFlight({
+        departure_id: 'JFK',
+        arrival_id: 'CDG',
+        outbound_date: '2026-03-01',
+        return_date: '2026-03-08',
+        type: 2,
+      });
 
-      const key = (cacheManager.get as jest.Mock<unknown, [string]>).mock
-        .calls[0][0];
-      const parsed = JSON.parse(key) as Record<string, unknown>;
-      expect(parsed.return_date).toBeUndefined();
-      expect(parsed.type).toBe(2);
+      const keys = (cacheManager.get as jest.Mock<unknown, [string]>).mock
+        .calls as [string][];
+      expect(keys[0][0]).toBe(keys[1][0]);
     });
   });
 

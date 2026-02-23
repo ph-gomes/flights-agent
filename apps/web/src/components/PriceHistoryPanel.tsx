@@ -121,7 +121,7 @@ export function PriceHistoryPanel({
           const response = await fetch(`/api/price-history?${params}`);
           const body = (await response.json()) as PriceHistoryResponse;
           if (!cancelled) setData(body);
-        } catch (err) {
+        } catch (err: unknown) {
           if (!cancelled)
             setError(err instanceof Error ? err.message : "Failed to load");
         } finally {

@@ -65,6 +65,7 @@ export interface UseChatSessionsReturn {
   saveSession: (
     messages: SessionMessage[],
     priceHistoryRoute?: { departure: string; arrival: string } | null,
+    sessionIdOverride?: string,
   ) => void;
   switchSession: (id: string) => void;
   deleteSession: (id: string) => void;
@@ -104,11 +105,13 @@ export function useChatSessions(): UseChatSessionsReturn {
     (
       messages: SessionMessage[],
       priceHistoryRoute?: { departure: string; arrival: string } | null,
+      sessionIdOverride?: string,
     ) => {
-      if (!activeId) return;
+      const targetId = sessionIdOverride ?? activeId;
+      if (!targetId) return;
       setSessions((prev) => {
         const next = prev.map((s) =>
-          s.id === activeId
+          s.id === targetId
             ? {
                 ...s,
                 title: deriveTitle(messages),

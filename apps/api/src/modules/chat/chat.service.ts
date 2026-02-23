@@ -21,11 +21,14 @@ export interface ChatMessage {
 export interface ChatResponse {
   message: string;
   flightResults: BaseResponse | null;
+  /** Set when round-trip search was done as outbound-only; frontend uses it for return-options API. */
+  return_date?: string;
 }
 
 @Injectable()
 export class ChatService {
   private lastFlightResult: BaseResponse | null = null;
+  private lastReturnDate: string | null = null;
   private readonly logger = new Logger(ChatService.name);
   private openaiKey: string;
 
@@ -43,12 +46,13 @@ export class ChatService {
 
   async chat(messages: ChatMessage[]): Promise<ChatResponse> {
     this.lastFlightResult = null;
+    this.lastReturnDate = null;
     this.logger.debug(`chat() called with ${messages.length} message(s)`);
 
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD for date resolution
     const searchFlightsTool = new DynamicStructuredTool({
       name: 'search_flights',
-      description: `Search for flights using Google Flights. Use IATA 3-letter airport codes (e.g. JFK, CDG, LHR) for departure_id and arrival_id. Dates in YYYY-MM-DD; outbound_date must be today or in the future (today is ${today}). type: 1 = round trip, 2 = one way.`,
+      description: `Search for flights using Google Flights. Use IATA 3-letter airport codes (e.g. JFK, CDG, LHR) for departure_id and arrival_id. Dates in YYYY-MM-DD; outbound_date must be today or in the future (today is ${today}). type: 1 = round trip, 2 = one way. You can pass optional filters: adults/children, travel_class (1=economy,2=premium,3=business,4=first), stops (0=any,1=nonstop,2=1 or fewer,3=2 or fewer), max_price (USD), include_airlines or exclude_airlines (e.g. "DL" for Delta, "SKYTEAM"), outbound_times/return_times ("startHour,endHour" 0-23).`,
       schema: z.object({
         departure_id: z
           .string()
@@ -65,15 +69,78 @@ export class ChatService {
           .number()
           .optional()
           .describe('1 = round trip, 2 = one way. Default 2'),
+        adults: z.number().optional().describe('Number of adults. Default 1'),
+        children: z
+          .number()
+          .optional()
+          .describe('Number of children. Default 0'),
+        travel_class: z
+          .number()
+          .optional()
+          .describe('1=Economy, 2=Premium economy, 3=Business, 4=First'),
+        stops: z
+          .number()
+          .optional()
+          .describe(
+            '0=any stops, 1=nonstop only, 2=1 stop or fewer, 3=2 stops or fewer',
+          ),
+        max_price: z
+          .number()
+          .optional()
+          .describe('Maximum ticket price in USD'),
+        outbound_times: z
+          .string()
+          .optional()
+          .describe(
+            'Outbound time range as "startHour,endHour" (0-23), e.g. "6,18" for 6am-6pm',
+          ),
+        return_times: z
+          .string()
+          .optional()
+          .describe(
+            'Return time range for round trips. Same format as outbound_times',
+          ),
+        include_airlines: z
+          .string()
+          .optional()
+          .describe(
+            'Airline codes to include, comma-separated (e.g. DL,AA or SKYTEAM). Do not use with exclude_airlines',
+          ),
+        exclude_airlines: z
+          .string()
+          .optional()
+          .describe(
+            'Airline codes to exclude, comma-separated. Do not use with include_airlines',
+          ),
+        sort_by: z
+          .number()
+          .optional()
+          .describe(
+            'Sort: 1=top, 2=price, 3=departure time, 4=arrival time, 5=duration, 6=emissions',
+          ),
       }),
       func: async (args) => {
-        const params = {
+        const isRoundTrip = args.type === 1 && args.return_date;
+        const params: Record<string, unknown> = {
           departure_id: args.departure_id,
           arrival_id: args.arrival_id,
           outbound_date: args.outbound_date,
-          return_date: args.return_date ?? undefined,
-          type: args.type ?? 2,
+          return_date: isRoundTrip ? undefined : (args.return_date ?? undefined),
+          type: isRoundTrip ? 2 : (args.type ?? 2),
         };
+        if (args.adults != null) params.adults = args.adults;
+        if (args.children != null) params.children = args.children;
+        if (args.travel_class != null) params.travel_class = args.travel_class;
+        if (args.stops != null) params.stops = args.stops;
+        if (args.max_price != null) params.max_price = args.max_price;
+        if (args.outbound_times != null)
+          params.outbound_times = args.outbound_times;
+        if (args.return_times != null) params.return_times = args.return_times;
+        if (args.include_airlines != null)
+          params.include_airlines = args.include_airlines;
+        if (args.exclude_airlines != null)
+          params.exclude_airlines = args.exclude_airlines;
+        if (args.sort_by != null) params.sort_by = args.sort_by;
         this.logger.debug(
           `search_flights tool invoked: ${JSON.stringify(params)}`,
         );
@@ -95,7 +162,7 @@ export class ChatService {
             no_results: true,
             searched: params,
             hint:
-              `No flights returned for ${params.departure_id}→${params.arrival_id} on ${params.outbound_date}. ` +
+              `No flights returned for ${String(params.departure_id)}→${String(params.arrival_id)} on ${String(params.outbound_date)}. ` +
               `SerpAPI often returns empty results for dates within 7 days. ` +
               `REQUIRED: call search_flights again with outbound_date at least 7 days from today (${today}), ` +
               `OR try an alternative departure airport (e.g. EWR or LGA for New York, ` +
@@ -105,6 +172,7 @@ export class ChatService {
 
         await this.priceHistoryService.saveSearch(params, result);
         this.lastFlightResult = result;
+        this.lastReturnDate = isRoundTrip ? args.return_date ?? null : null;
         return JSON.stringify(result);
       },
     });
@@ -199,6 +267,7 @@ For follow-up refinements (e.g. "only direct", "different date"), call the tool 
     return {
       message,
       flightResults: this.lastFlightResult ?? null,
+      return_date: this.lastReturnDate ?? undefined,
     };
   }
 

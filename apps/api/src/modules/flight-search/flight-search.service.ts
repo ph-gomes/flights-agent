@@ -2,15 +2,8 @@ import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BaseResponse, EngineParameters, getJson } from 'serpapi';
-
-/** Normalized search params for stable cache keys. */
-interface NormalizedSearchParams {
-  departure_id: string;
-  arrival_id: string;
-  outbound_date: string;
-  return_date: string | undefined;
-  type: 1 | 2;
-}
+import { SerpGoogleFlightResponseDto } from './dto/serp-google-flight-response.dto';
+import { NormalizedSearchParams } from './dto/normalized-search-params.dto';
 
 @Injectable()
 export class FlightSearchService {
@@ -34,17 +27,13 @@ export class FlightSearchService {
     this.logger.debug(
       `_searchFlight calling SerpAPI: ${JSON.stringify({ ...parameters, api_key: '[redacted]' })}`,
     );
-    const response = await getJson({
+    const response: SerpGoogleFlightResponseDto = await getJson({
       engine: 'google_flights',
       ...parameters,
       api_key: this.apiKey,
     });
-    const best = Array.isArray(response?.best_flights)
-      ? response.best_flights.length
-      : 0;
-    const other = Array.isArray(response?.other_flights)
-      ? response.other_flights.length
-      : 0;
+    const best = response?.best_flights?.length ?? 0;
+    const other = response?.other_flights?.length ?? 0;
     this.logger.debug(
       `_searchFlight result: ${best} best_flights, ${other} other_flights`,
     );
@@ -92,9 +81,7 @@ export class FlightSearchService {
       return cachedData as BaseResponse;
     }
     this.logger.debug('searchFlight cache miss, calling API');
-    const data = await this._searchFlight(
-      normalized as unknown as EngineParameters,
-    );
+    const data = await this._searchFlight(normalized);
     await this.cacheManager.set(cacheKey, data);
     this.logger.debug('searchFlight result cached');
     return data;

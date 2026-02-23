@@ -72,9 +72,7 @@ export class PriceAlertsService {
           type: 2,
         });
 
-        const currentPrice = extractLowestPrice(
-          result as unknown as Record<string, unknown>,
-        );
+        const currentPrice = extractLowestPrice(result);
 
         if (currentPrice == null) continue;
 

@@ -2,18 +2,26 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import type { Cache } from '@nestjs/cache-manager';
-import type { BaseResponse } from 'serpapi';
 import { FlightSearchService } from './flight-search.service';
+import { SerpGoogleFlightResponseDto } from './dto/serp-google-flight-response.dto';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-const MOCK_SERPAPI_RESPONSE: BaseResponse = {
+const MOCK_SERPAPI_RESPONSE: SerpGoogleFlightResponseDto = {
   best_flights: [
     {
       flights: [
         {
-          departure_airport: { name: 'JFK Airport', id: 'JFK', time: '2026-03-01 10:00' },
-          arrival_airport: { name: 'Charles de Gaulle', id: 'CDG', time: '2026-03-02 00:30' },
+          departure_airport: {
+            name: 'JFK Airport',
+            id: 'JFK',
+            time: '2026-03-01 10:00',
+          },
+          arrival_airport: {
+            name: 'Charles de Gaulle',
+            id: 'CDG',
+            time: '2026-03-02 00:30',
+          },
           duration: 450,
           airline: 'Air France',
           airline_logo: 'https://example.com/af.png',
@@ -34,20 +42,18 @@ const MOCK_SERPAPI_RESPONSE: BaseResponse = {
     lowest_price: 780,
     price_level: 'low',
   },
-} as unknown as BaseResponse;
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function buildCacheManager(
-  overrides: Partial<Cache> = {},
-): Cache {
+function buildCacheManager(overrides: Partial<Cache> = {}): Cache {
   return {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined),
     del: jest.fn().mockResolvedValue(undefined),
     reset: jest.fn().mockResolvedValue(undefined),
     ...overrides,
-  } as unknown as Cache;
+  } as Cache;
 }
 
 function buildConfigService(
@@ -78,7 +84,10 @@ describe('FlightSearchService', () => {
       providers: [
         FlightSearchService,
         { provide: CACHE_MANAGER, useValue: cacheManager },
-        { provide: ConfigService, useValue: buildConfigService(configOverrides) },
+        {
+          provide: ConfigService,
+          useValue: buildConfigService(configOverrides),
+        },
       ],
     }).compile();
 
@@ -87,9 +96,9 @@ describe('FlightSearchService', () => {
 
   describe('constructor', () => {
     it('throws if SERP_API_KEY is not configured', async () => {
-      await expect(
-        createService({}, { SERP_API_KEY: '' }),
-      ).rejects.toThrow('SERP_API_KEY is not configured');
+      await expect(createService({}, { SERP_API_KEY: '' })).rejects.toThrow(
+        'SERP_API_KEY is not configured',
+      );
     });
 
     it('instantiates successfully when SERP_API_KEY is set', async () => {
@@ -149,11 +158,16 @@ describe('FlightSearchService', () => {
         .mockResolvedValue(MOCK_SERPAPI_RESPONSE);
 
       // type passed as string vs. number should produce the same cache key
-      await service.searchFlight({ ...searchParams, type: '2' as unknown as number });
+      await service.searchFlight({
+        ...searchParams,
+        type: 2,
+      });
       await service.searchFlight({ ...searchParams, type: 2 });
 
-      const firstKey = (cacheManager.get as jest.Mock).mock.calls[0][0] as string;
-      const secondKey = (cacheManager.get as jest.Mock).mock.calls[1][0] as string;
+      const mockCalls = (cacheManager.get as jest.Mock<unknown, [string]>).mock
+        .calls;
+      const firstKey = mockCalls[0][0];
+      const secondKey = mockCalls[1][0];
 
       expect(firstKey).toBe(secondKey);
       expect(_searchSpy).toHaveBeenCalledTimes(2); // two cache misses, same key shape
@@ -175,7 +189,8 @@ describe('FlightSearchService', () => {
         type: 1,
       });
 
-      const key = (cacheManager.get as jest.Mock).mock.calls[0][0] as string;
+      const key = (cacheManager.get as jest.Mock<unknown, [string]>).mock
+        .calls[0][0];
       const parsed = JSON.parse(key) as Record<string, unknown>;
       expect(parsed.return_date).toBe('2026-03-08');
       expect(parsed.type).toBe(1);
@@ -194,7 +209,8 @@ describe('FlightSearchService', () => {
         type: 2,
       });
 
-      const key = (cacheManager.get as jest.Mock).mock.calls[0][0] as string;
+      const key = (cacheManager.get as jest.Mock<unknown, [string]>).mock
+        .calls[0][0];
       const parsed = JSON.parse(key) as Record<string, unknown>;
       expect(parsed.return_date).toBeUndefined();
       expect(parsed.type).toBe(2);

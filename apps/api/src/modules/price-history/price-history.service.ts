@@ -31,7 +31,7 @@ export class PriceHistoryService {
       outboundDate: params.outbound_date ?? null,
       returnDate: params.return_date ?? null,
       type: params.type ?? 2,
-      resultPayload: results as unknown as Record<string, unknown>,
+      resultPayload: results,
     });
     return this.recordRepo.save(record);
   }

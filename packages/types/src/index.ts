@@ -101,7 +101,33 @@ export interface ChatResponse {
   flightResults?: FlightSearchResult | null;
 }
 
-// ─── Price History ───────────────────────────────────────────────────────────
+// ─── Price Alerts ────────────────────────────────────────────────────────────
+
+export type PriceAlertStatus = 'active' | 'triggered' | 'expired';
+
+export interface PriceAlert {
+  id: string;
+  departureId: string;
+  arrivalId: string;
+  /** YYYY-MM-DD */
+  outboundDate: string;
+  targetPrice: number;
+  email: string;
+  status: PriceAlertStatus;
+  createdAt: string;
+  triggeredAt: string | null;
+}
+
+export interface CreatePriceAlertDto {
+  departureId: string;
+  arrivalId: string;
+  /** YYYY-MM-DD */
+  outboundDate: string;
+  targetPrice: number;
+  email: string;
+}
+
+// ─── Price History ────────────────────────────────────────────────────────────
 
 export interface PriceHistoryRecord {
   id: string;

@@ -4,6 +4,7 @@ import type { SessionMessage } from "./types/session";
 import { FlightResults } from "./components/FlightResults";
 import { MarkdownContent } from "./components/MarkdownContent";
 import { PriceHistoryPanel } from "./components/PriceHistoryPanel";
+import { SetPriceAlertModal, type AlertTarget } from "./components/SetPriceAlertModal";
 import { SkeletonResults } from "./components/SkeletonCard";
 import { Sidebar } from "./components/Sidebar";
 import { useChatSessions } from "./hooks/useChatSessions";
@@ -44,6 +45,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPriceHistory, setShowPriceHistory] = useState(false);
+  const [alertTarget, setAlertTarget] = useState<AlertTarget | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -244,7 +246,10 @@ export default function App() {
                     </div>
                     {m.flightResults && (
                       <div className="message-cards">
-                        <FlightResults data={m.flightResults} />
+                        <FlightResults
+                          data={m.flightResults}
+                          onSetAlert={setAlertTarget}
+                        />
                       </div>
                     )}
                   </>
@@ -349,6 +354,14 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* Price Alert Modal */}
+      {alertTarget && (
+        <SetPriceAlertModal
+          target={alertTarget}
+          onClose={() => setAlertTarget(null)}
+        />
+      )}
 
       {/* Price History Panel */}
       {showPriceHistory && (

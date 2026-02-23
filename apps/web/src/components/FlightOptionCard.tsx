@@ -1,9 +1,11 @@
 import { useState } from "react";
 import type { FlightOption, FlightLeg, LayoverInfo } from "../types/chat";
+import type { AlertTarget } from "./SetPriceAlertModal";
 
 export interface FlightOptionCardProps {
   flight: FlightOption;
   isCheapest?: boolean;
+  onSetAlert?: (target: AlertTarget) => void;
 }
 
 // ─── Formatting helpers ──────────────────────────────────────────────────────
@@ -223,7 +225,7 @@ function LeafIcon() {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export function FlightOptionCard({ flight, isCheapest }: FlightOptionCardProps) {
+export function FlightOptionCard({ flight, isCheapest, onSetAlert }: FlightOptionCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   const segments = flight.flights ?? [];
@@ -346,9 +348,27 @@ export function FlightOptionCard({ flight, isCheapest }: FlightOptionCardProps) 
                   : `${Math.abs(co2Diff)}% more CO₂ than typical for this route`}
               </div>
             )}
-            <button type="button" className="foc-select-btn">
-              Select flight
-            </button>
+            <div style={{ display: "flex", gap: "0.5rem", marginLeft: "auto" }}>
+              {onSetAlert && (
+                <button
+                  type="button"
+                  className="foc-alert-btn"
+                  onClick={() =>
+                    onSetAlert({
+                      departureId: originCode === "—" ? "" : originCode,
+                      arrivalId: destCode === "—" ? "" : destCode,
+                      outboundDate: originDatetime?.split(" ")[0] ?? "",
+                      currentPrice: flight.price,
+                    })
+                  }
+                >
+                  🔔 Set Alert
+                </button>
+              )}
+              <button type="button" className="foc-select-btn">
+                Select flight
+              </button>
+            </div>
           </div>
         </div>
       )}

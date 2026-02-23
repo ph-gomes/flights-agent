@@ -1,8 +1,10 @@
 import type { FlightSearchResponse, FlightOption } from "../types/chat";
 import { FlightOptionCard } from "./FlightOptionCard";
+import type { AlertTarget } from "./SetPriceAlertModal";
 
 interface FlightResultsProps {
   data: FlightSearchResponse | null | undefined;
+  onSetAlert?: (target: AlertTarget) => void;
 }
 
 function formatPrice(price: number | undefined): string {
@@ -10,7 +12,7 @@ function formatPrice(price: number | undefined): string {
   return `$${price.toLocaleString()}`;
 }
 
-export function FlightResults({ data }: FlightResultsProps) {
+export function FlightResults({ data, onSetAlert }: FlightResultsProps) {
   if (!data) return null;
 
   const best: FlightOption[] = data.best_flights ?? [];
@@ -64,6 +66,7 @@ export function FlightResults({ data }: FlightResultsProps) {
               Number.isFinite(flight.price) &&
               flight.price === lowestPrice
             }
+            onSetAlert={onSetAlert}
           />
         ))}
       </div>

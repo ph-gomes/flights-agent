@@ -2,16 +2,17 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { FlightSearchModule } from './modules/flight-search/flight-search.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { PriceHistoryModule } from './modules/price-history/price-history.module';
+import { PriceAlertsModule } from './modules/price-alerts/price-alerts.module';
 import { AppCacheModule } from './cache.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -43,6 +44,7 @@ import { AppCacheModule } from './cache.module';
     AppCacheModule,
     FlightSearchModule,
     PriceHistoryModule,
+    PriceAlertsModule,
     ChatModule,
   ],
   controllers: [AppController],

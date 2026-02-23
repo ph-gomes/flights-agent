@@ -147,23 +147,41 @@ Tests use an in-memory SQLite database and mock the `ChatService` so they run in
 ## Folder structure highlights
 
 ```
-apps/api/src/
-  modules/
-    chat/              POST /chat controller + LangChain agent
-    flight-search/     SerpAPI wrapper + Redis caching
-    price-history/     TypeORM entity + price history controller
-  cache.module.ts      Redis with in-memory fallback
+apps/api/
+  src/
+    modules/
+      chat/              POST /chat controller, LangChain agent, dto/chat-request.dto
+      flight-search/     SerpAPI wrapper, Redis caching, dto/
+      price-alerts/      Controller, service, dto/create-price-alert.dto, entities/
+      price-history/     TypeORM entity, controller, util, dto/
+    app.module.ts
+    app.controller.ts   health-check
+    cache.module.ts     Redis with in-memory fallback
+  test/
+    app.e2e-spec.ts     Health + price-history E2E
+    chat.e2e-spec.ts    Chat happy path (mocked ChatService)
+    chat-agent.e2e-spec.ts   Real agent + tool path (mocked SerpAPI/OpenAI)
+    price-alerts.e2e-spec.ts
 
 apps/web/src/
   components/
-    FlightOptionCard   Rich flight card with segments, layovers, airline logo
-    FlightResults      Card grid + price insights header
-    PriceHistoryPanel  Recharts AreaChart + stats row
-    SkeletonCard       Shimmer skeleton loader
-  types/
-    chat.ts            Re-exports from @repo/types
-    price-history.ts   Re-exports from @repo/types
+    FlightOptionCard    Rich flight card: segments, layovers, airline logo
+    FlightResults       Card grid + price insights header
+    PriceHistoryPanel   Recharts AreaChart + stats row
+    SetPriceAlertModal  Create price alert form
+    SkeletonCard        Shimmer skeleton loader
+    Sidebar             Session list + nav
+    MarkdownContent     Renders assistant markdown
+  hooks/
+    useChatSessions.ts
+    usePriceAlerts.ts
+  types/                Re-exports from @repo/types
+    chat.ts
+    price-history.ts
+    session.ts
+  utils/
+    formatters.ts
 
 packages/types/src/
-  index.ts             Canonical shared interfaces
+  index.ts              Canonical shared interfaces
 ```

@@ -8,9 +8,6 @@ import { SetPriceAlertModal, type AlertTarget } from "./components/SetPriceAlert
 import { SkeletonResults } from "./components/SkeletonCard";
 import { Sidebar } from "./components/Sidebar";
 import { useChatSessions } from "./hooks/useChatSessions";
-import "./App.css";
-
-// ─── Suggested queries ───────────────────────────────────────────────────────
 
 const SUGGESTED_QUERIES = [
   "Flights from NYC to London next weekend",
@@ -19,257 +16,175 @@ const SUGGESTED_QUERIES = [
   "NYC to Rome, one way, late March",
 ];
 
-// ─── App ─────────────────────────────────────────────────────────────────────
-
 export default function App() {
-  const {
-    sessions,
-    activeId,
-    activeSession,
-    newSession,
-    saveSession,
-    switchSession,
-    deleteSession,
-  } = useChatSessions();
+  const { sessions, activeId, activeSession, newSession, saveSession, switchSession, deleteSession } = useChatSessions();
 
-  // ── Local UI state ────────────────────────────────────────────────────────
-  const [messages, setMessages] = useState<SessionMessage[]>(
-    () => activeSession?.messages ?? [],
-  );
-  const [priceHistoryRoute, setPriceHistoryRoute] = useState<{
-    departure: string;
-    arrival: string;
-  } | null>(() => activeSession?.priceHistoryRoute ?? null);
-
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showPriceHistory, setShowPriceHistory] = useState(false);
-  const [alertTarget, setAlertTarget] = useState<AlertTarget | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [messages, setMessages]                   = useState<SessionMessage[]>(() => activeSession?.messages ?? []);
+  const [priceHistoryRoute, setPriceHistoryRoute] = useState<{ departure: string; arrival: string } | null>(() => activeSession?.priceHistoryRoute ?? null);
+  const [input, setInput]                         = useState("");
+  const [loading, setLoading]                     = useState(false);
+  const [error, setError]                         = useState<string | null>(null);
+  const [showPriceHistory, setShowPriceHistory]   = useState(false);
+  const [alertTarget, setAlertTarget]             = useState<AlertTarget | null>(null);
+  const [sidebarOpen, setSidebarOpen]             = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef       = useRef<HTMLInputElement>(null);
 
-  // ── Auto-scroll to bottom on new messages ─────────────────────────────────
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
-  // ── Sync local state when the active session changes ─────────────────────
   const prevActiveIdRef = useRef<string | null>(activeId);
   useEffect(() => {
     if (prevActiveIdRef.current === activeId) return;
     prevActiveIdRef.current = activeId;
     setMessages((activeSession?.messages as SessionMessage[]) ?? []);
     setPriceHistoryRoute(activeSession?.priceHistoryRoute ?? null);
-    setInput("");
-    setError(null);
-    setShowPriceHistory(false);
+    setInput(""); setError(null); setShowPriceHistory(false);
   }, [activeId, activeSession]);
 
-  // ── On mount: ensure there is always at least one active session ──────────
-  useEffect(() => {
+  useEffect(() => { if (!activeId) newSession(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sendMessage = useCallback(async (text?: string) => {
+    const query = (text ?? input).trim();
+    if (!query || loading) return;
     if (!activeId) newSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
-  // ─── Send a message ───────────────────────────────────────────────────────
-  const sendMessage = useCallback(
-    async (text?: string) => {
-      const query = (text ?? input).trim();
-      if (!query || loading) return;
+    const userMessage: SessionMessage = { role: "user", content: query };
+    const nextMessages = [...messages, userMessage];
+    setMessages(nextMessages); setInput(""); setLoading(true); setError(null);
+    setTimeout(() => inputRef.current?.focus(), 0);
 
-      // Ensure we have an active session (create one on first send if needed)
-      if (!activeId) newSession();
+    try {
+      const res  = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: nextMessages.map(({ role, content }) => ({ role, content })) }),
+      });
+      const data = (await res.json()) as ChatResponse & { message?: string };
+      if (!res.ok) throw new Error(data?.message ?? `Request failed: ${res.status}`);
 
-      const userMessage: SessionMessage = { role: "user", content: query };
-      const nextMessages: SessionMessage[] = [...messages, userMessage];
+      const assistantMessage: SessionMessage = {
+        role: "assistant", content: data.message, flightResults: data.flightResults ?? null,
+      };
+      const withReply = [...nextMessages, assistantMessage];
+      setMessages(withReply);
 
-      setMessages(nextMessages);
-      setInput("");
-      setLoading(true);
-      setError(null);
-      setTimeout(() => inputRef.current?.focus(), 0);
-
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: nextMessages.map(({ role, content }) => ({
-              role,
-              content,
-            })),
-          }),
-        });
-
-        const data = (await res.json()) as ChatResponse & { message?: string };
-        if (!res.ok) {
-          throw new Error(data?.message ?? `Request failed: ${res.status}`);
+      let newRoute = priceHistoryRoute;
+      if (data.flightResults) {
+        const fr        = data.flightResults as FlightSearchResponse;
+        const firstOpt  = fr.best_flights?.[0] ?? fr.other_flights?.[0];
+        if (firstOpt) {
+          const segs = firstOpt.flights ?? [];
+          const dep  = segs[0]?.departure_airport?.id ?? (firstOpt as { departure_airport?: { id?: string } }).departure_airport?.id;
+          const arr  = segs[segs.length - 1]?.arrival_airport?.id ?? (firstOpt as { arrival_airport?: { id?: string } }).arrival_airport?.id;
+          if (dep && arr) { newRoute = { departure: dep, arrival: arr }; setPriceHistoryRoute(newRoute); }
         }
-
-        const assistantMessage: SessionMessage = {
-          role: "assistant",
-          content: data.message,
-          flightResults: data.flightResults ?? null,
-        };
-        const withReply = [...nextMessages, assistantMessage];
-        setMessages(withReply);
-
-        // Extract route for price history
-        let newRoute = priceHistoryRoute;
-        if (data.flightResults) {
-          const fr = data.flightResults as FlightSearchResponse;
-          const firstOption = fr.best_flights?.[0] ?? fr.other_flights?.[0];
-          if (firstOption) {
-            const segs = firstOption.flights ?? [];
-            const dep =
-              segs[0]?.departure_airport?.id ??
-              (firstOption as { departure_airport?: { id?: string } })
-                .departure_airport?.id;
-            const lastSeg = segs[segs.length - 1];
-            const arr =
-              lastSeg?.arrival_airport?.id ??
-              (firstOption as { arrival_airport?: { id?: string } })
-                .arrival_airport?.id;
-            if (dep && arr) {
-              newRoute = { departure: dep, arrival: arr };
-              setPriceHistoryRoute(newRoute);
-            }
-          }
-        }
-
-        // Persist to localStorage
-        saveSession(withReply, newRoute);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      } finally {
-        setLoading(false);
       }
-    },
-    [input, loading, messages, activeId, priceHistoryRoute, newSession, saveSession],
-  );
+      saveSession(withReply, newRoute);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }, [input, loading, messages, activeId, priceHistoryRoute, newSession, saveSession]);
 
-  // ─── Session actions ──────────────────────────────────────────────────────
-  const handleNewChat = useCallback(() => {
-    newSession();
-    // Local state will be cleared via the activeId useEffect above
-  }, [newSession]);
+  const handleNewChat        = useCallback(() => newSession(), [newSession]);
+  const handleSwitchSession  = useCallback((id: string) => { switchSession(id); setShowPriceHistory(false); }, [switchSession]);
+  const openPriceHistory     = useCallback(() => setShowPriceHistory(true),  []);
+  const closePriceHistory    = useCallback(() => setShowPriceHistory(false), []);
 
-  const handleSwitchSession = useCallback(
-    (id: string) => {
-      switchSession(id);
-      setShowPriceHistory(false);
-    },
-    [switchSession],
-  );
+  const hasFlightResults = messages.some((m) => m.role === "assistant" && m.flightResults);
+  const isEmptyState     = messages.length === 0 && !loading;
 
-  // ─── Price history ────────────────────────────────────────────────────────
-  const openPriceHistory = useCallback(() => setShowPriceHistory(true), []);
-  const closePriceHistory = useCallback(() => setShowPriceHistory(false), []);
-
-  const hasFlightResults = messages.some(
-    (m) => m.role === "assistant" && m.flightResults,
-  );
-  const isEmptyState = messages.length === 0 && !loading;
+  // ── Shared class strings ──
+  const chipBase = "px-3 py-[0.35rem] text-[0.78rem] rounded-full border border-app-border bg-app-surface text-app-text-muted cursor-pointer hover:border-app-accent hover:text-app-accent hover:bg-app-accent/15 transition-all whitespace-nowrap";
 
   return (
-    <div className={`app app-dark ${sidebarOpen ? "app-sidebar-open" : ""}`}>
+    <div className="flex min-h-screen w-full bg-app-bg text-app-text max-[680px]:flex-col">
 
       {/* ── Sidebar ── */}
       {sidebarOpen && (
         <>
-          {/* Mobile backdrop */}
-          <div
-            className="sidebar-backdrop"
-            onClick={() => setSidebarOpen(false)}
-            aria-hidden
-          />
+          <div className="hidden max-[680px]:block fixed inset-0 bg-black/50 z-[49]"
+            onClick={() => setSidebarOpen(false)} aria-hidden />
           <Sidebar
-            sessions={sessions}
-            activeId={activeId}
-            onNew={handleNewChat}
-            onSwitch={handleSwitchSession}
-            onDelete={deleteSession}
-            onClose={() => setSidebarOpen(false)}
+            sessions={sessions} activeId={activeId}
+            onNew={handleNewChat} onSwitch={handleSwitchSession}
+            onDelete={deleteSession} onClose={() => setSidebarOpen(false)}
           />
         </>
       )}
 
-      {/* ── Main area ── */}
-      <main className="app-main">
+      {/* ── Main ── */}
+      <main className="flex-1 min-w-0 max-w-[min(960px,96vw)] mx-auto px-5 py-4 pb-6 flex flex-col gap-4 max-[680px]:max-w-full max-[680px]:px-4">
+
         {/* Header */}
-        <header className="app-header">
-          <button
-            type="button"
-            className="sidebar-toggle-btn"
-            onClick={() => setSidebarOpen((o) => !o)}
-            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+        <header className="flex items-center gap-2.5 pt-3">
+          <button type="button" aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
             title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
-          >
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="shrink-0 flex items-center justify-center w-8 h-8 bg-transparent border-none rounded-md text-app-text-muted cursor-pointer hover:bg-app-border hover:text-app-text transition-colors">
             <MenuIcon />
           </button>
-          <div className="app-header-brand">
+          <div className="flex items-center gap-2 font-bold text-[1.05rem] text-app-text">
             <PlaneSVG />
             <span>Thrifty Traveler</span>
           </div>
-          <p className="app-header-sub">AI-Powered Flight Search</p>
+          <p className="text-[0.8rem] text-app-text-muted m-0">AI-Powered Flight Search</p>
         </header>
 
-        {/* Messages */}
-        <div className="chat-container">
-          <div className="messages" role="log" aria-live="polite">
+        {/* Chat area */}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4 min-h-[200px] max-h-[68vh] overflow-y-auto p-5 bg-app-surface rounded-2xl border border-app-border scroll-smooth"
+            role="log" aria-live="polite">
 
             {/* Empty state */}
             {isEmptyState && (
-              <div className="messages-empty-state">
+              <div className="flex flex-col items-center justify-center text-center gap-3 py-10 flex-1">
                 <PlaneSVG large />
-                <h2>Where do you want to go?</h2>
-                <p>
-                  Ask me to find flights in plain English. I'll search Google
-                  Flights in real time.
+                <h2 className="text-[1.3rem] font-bold m-0 text-app-text">Where do you want to go?</h2>
+                <p className="text-[0.9rem] text-app-text-muted m-0 max-w-[36ch] leading-relaxed">
+                  Ask me to find flights in plain English. I'll search Google Flights in real time.
                 </p>
               </div>
             )}
 
-            {/* Message bubbles */}
+            {/* Messages */}
             {messages.map((m, i) => (
-              <div key={i} className={`message message-${m.role}`}>
-                <span className="message-role">
+              <div key={i} className={`flex flex-col gap-1.5 max-w-[95%] ${m.role === "user" ? "self-end" : "self-start max-w-full"}`}>
+                <span className="text-[0.72rem] font-semibold text-app-text-muted uppercase tracking-[0.04em]">
                   {m.role === "user" ? "You" : "Assistant"}
                 </span>
                 {m.role === "assistant" ? (
                   <>
-                    <div className="message-content">
+                    <div className="px-3.5 py-[0.65rem] rounded-[10px] break-words text-[0.93rem] leading-[1.55] bg-app-surface-2 border border-app-border text-app-text">
                       <MarkdownContent content={m.content} />
                     </div>
                     {m.flightResults && (
-                      <div className="message-cards">
-                        <FlightResults
-                          data={m.flightResults}
-                          onSetAlert={setAlertTarget}
-                        />
+                      <div className="mt-2 w-full min-w-0">
+                        <FlightResults data={m.flightResults} onSetAlert={setAlertTarget} />
                       </div>
                     )}
                   </>
                 ) : (
-                  <div className="message-content">{m.content}</div>
+                  <div className="px-3.5 py-[0.65rem] rounded-[10px] break-words text-[0.93rem] leading-[1.55] bg-app-accent text-white">
+                    {m.content}
+                  </div>
                 )}
               </div>
             ))}
 
-            {/* Loading: typing indicator + skeleton cards */}
+            {/* Loading */}
             {loading && (
-              <div className="message message-assistant">
-                <span className="message-role">Assistant</span>
-                <div className="message-content typing">
-                  <span className="typing-dot" />
-                  <span className="typing-dot" />
-                  <span className="typing-dot" />
+              <div className="flex flex-col gap-1.5 self-start max-w-full">
+                <span className="text-[0.72rem] font-semibold text-app-text-muted uppercase tracking-[0.04em]">Assistant</span>
+                <div className="px-3.5 py-[0.65rem] rounded-[10px] flex items-center gap-1.5 text-app-text-muted bg-app-surface-2 border border-app-border text-[0.93rem]">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-app-accent animate-typing typing-dot shrink-0" />
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-app-accent animate-typing typing-dot shrink-0" />
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-app-accent animate-typing typing-dot shrink-0" />
                   Searching Google Flights…
                 </div>
-                <div className="message-cards">
+                <div className="mt-2 w-full min-w-0">
                   <SkeletonResults count={3} />
                 </div>
               </div>
@@ -278,96 +193,62 @@ export default function App() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Error */}
           {error && (
-            <div className="error-banner" role="alert">
+            <div className="flex items-center justify-between gap-2 px-3.5 py-[0.65rem] bg-app-red/10 border border-app-red/30 rounded-lg text-[0.875rem] text-app-red" role="alert">
               <span>{error}</span>
-              <button
-                type="button"
-                className="error-banner-dismiss"
-                onClick={() => setError(null)}
-                aria-label="Dismiss error"
-              >
-                ×
-              </button>
+              <button type="button" onClick={() => setError(null)} aria-label="Dismiss error"
+                className="bg-transparent border-none text-app-red cursor-pointer text-xl leading-none p-0 opacity-70 hover:opacity-100">×</button>
             </div>
           )}
 
           {hasFlightResults && (
-            <p className="app-disclaimer">
-              Prices and availability change frequently. Check the airline or
-              booking site for the latest details before purchasing.
+            <p className="text-[0.72rem] text-app-text-subtle m-0 leading-snug text-center">
+              Prices and availability change frequently. Check the airline or booking site for the latest details before purchasing.
             </p>
           )}
         </div>
 
         {/* Input area */}
-        <div className="app-input-area">
-          <div className="app-input-chips">
-            {/* Suggested queries on empty state */}
-            {isEmptyState &&
-              SUGGESTED_QUERIES.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  className="app-chip"
-                  onClick={() => sendMessage(q)}
-                >
-                  {q}
-                </button>
-              ))}
-
-            {/* Price history chip once we have a route */}
+        <div className="shrink-0">
+          <div className="flex flex-wrap gap-[0.45rem] mb-[0.65rem]">
+            {isEmptyState && SUGGESTED_QUERIES.map((q) => (
+              <button key={q} type="button" className={chipBase} onClick={() => sendMessage(q)}>{q}</button>
+            ))}
             {priceHistoryRoute && !isEmptyState && (
-              <button
-                type="button"
-                className="app-chip app-chip-accent"
-                onClick={openPriceHistory}
-              >
-                📈 {priceHistoryRoute.departure} →{" "}
-                {priceHistoryRoute.arrival} price history
+              <button type="button" onClick={openPriceHistory}
+                className={`${chipBase} border-app-accent text-app-accent bg-app-accent/15 hover:bg-app-accent/25`}>
+                📈 {priceHistoryRoute.departure} → {priceHistoryRoute.arrival} price history
               </button>
             )}
           </div>
-
-          <div className="input-row input-row-pro">
+          <div className="flex gap-2 items-center">
             <input
-              ref={inputRef}
-              type="text"
-              value={input}
+              ref={inputRef} type="text" value={input} disabled={loading}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Enter" && !e.shiftKey && sendMessage()
-              }
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
               placeholder={'Ask about flights… e.g. "JFK to CDG next Friday"'}
               aria-label="Message"
-              disabled={loading}
+              className="flex-1 py-3 px-4 rounded-full border border-app-border bg-app-surface text-app-text text-[0.93rem] transition-colors focus:outline-none focus:border-app-accent disabled:opacity-60 disabled:cursor-not-allowed placeholder:text-app-text-muted"
             />
-            <button
-              type="button"
-              className="app-input-send"
-              onClick={() => sendMessage()}
-              disabled={loading || !input.trim()}
-              aria-label="Send"
-            >
+            <button type="button" onClick={() => sendMessage()} disabled={loading || !input.trim()} aria-label="Send"
+              className="shrink-0 w-11 h-11 rounded-full border-none bg-app-accent text-white cursor-pointer flex items-center justify-center hover:bg-app-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <SendIcon />
             </button>
           </div>
         </div>
       </main>
 
-      {/* Price Alert Modal */}
+      {/* ── Price Alert Modal ── */}
       {alertTarget && (
-        <SetPriceAlertModal
-          target={alertTarget}
-          onClose={() => setAlertTarget(null)}
-        />
+        <SetPriceAlertModal target={alertTarget} onClose={() => setAlertTarget(null)} />
       )}
 
-      {/* Price History Panel */}
+      {/* ── Price History Panel ── */}
       {showPriceHistory && (
         <>
-          <div className="overlay" onClick={closePriceHistory} aria-hidden />
-          <div className="panel-wrapper">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-10" onClick={closePriceHistory} aria-hidden />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[11] w-[min(560px,94vw)] max-h-[88vh] overflow-y-auto rounded-[14px]">
             {priceHistoryRoute ? (
               <PriceHistoryPanel
                 departureId={priceHistoryRoute.departure}
@@ -376,9 +257,7 @@ export default function App() {
               />
             ) : (
               <PriceHistoryRouteForm
-                onLoad={(dep, arr) =>
-                  setPriceHistoryRoute({ departure: dep, arrival: arr })
-                }
+                onLoad={(dep, arr) => setPriceHistoryRoute({ departure: dep, arrival: arr })}
                 onClose={closePriceHistory}
               />
             )}
@@ -391,60 +270,34 @@ export default function App() {
 
 // ─── Route form ───────────────────────────────────────────────────────────────
 
-function PriceHistoryRouteForm({
-  onLoad,
-  onClose,
-}: {
-  onLoad: (departure: string, arrival: string) => void;
-  onClose: () => void;
-}) {
+function PriceHistoryRouteForm({ onLoad, onClose }: { onLoad: (d: string, a: string) => void; onClose: () => void }) {
   const [dep, setDep] = useState("");
   const [arr, setArr] = useState("");
 
+  const inputCls = "px-[0.9rem] py-[0.6rem] rounded-lg border border-app-border bg-app-surface text-app-text text-[0.9rem] focus:outline-none focus:border-app-accent tracking-[0.08em] font-semibold uppercase placeholder:text-app-text-muted";
+
   return (
-    <div className="price-history-panel" role="dialog" aria-label="Price history">
-      <div className="price-history-header">
-        <div className="ph-header-title">
-          <h3>Price history</h3>
-          <p className="ph-subtitle">Enter a route to view historical prices</p>
+    <div className="bg-[#18181e] border border-app-border rounded-[14px] p-5 flex flex-col gap-4" role="dialog" aria-label="Price history">
+      <div className="flex justify-between items-start gap-3">
+        <div>
+          <h3 className="text-[1.1rem] font-bold m-0">Price history</h3>
+          <p className="text-[0.78rem] text-app-text-muted mt-0.5 mb-0">Enter a route to view historical prices</p>
         </div>
-        <button
-          type="button"
-          className="ph-close-btn"
-          onClick={onClose}
-          aria-label="Close"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
+        <button type="button" onClick={onClose} aria-label="Close"
+          className="bg-transparent border-none text-app-text-muted cursor-pointer p-[0.2rem] rounded-md flex items-center justify-center shrink-0 hover:text-app-text hover:bg-app-border transition-colors">
+          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
       </div>
-      <div className="price-history-form">
-        <input
-          type="text"
-          placeholder="Departure (e.g. JFK)"
-          value={dep}
-          onChange={(e) => setDep(e.target.value.toUpperCase())}
-          maxLength={3}
-        />
-        <input
-          type="text"
-          placeholder="Arrival (e.g. CDG)"
-          value={arr}
-          onChange={(e) => setArr(e.target.value.toUpperCase())}
-          maxLength={3}
-        />
-        <button
-          type="button"
-          className="ph-load-btn"
-          onClick={() =>
-            dep.trim().length === 3 &&
-            arr.trim().length === 3 &&
-            onLoad(dep.trim(), arr.trim())
-          }
-          disabled={dep.trim().length !== 3 || arr.trim().length !== 3}
-        >
+      <div className="flex flex-col gap-2.5 py-1">
+        <input type="text" placeholder="Departure (e.g. JFK)" maxLength={3} className={inputCls}
+          value={dep} onChange={(e) => setDep(e.target.value.toUpperCase())} />
+        <input type="text" placeholder="Arrival (e.g. CDG)" maxLength={3} className={inputCls}
+          value={arr} onChange={(e) => setArr(e.target.value.toUpperCase())} />
+        <button type="button" disabled={dep.trim().length !== 3 || arr.trim().length !== 3}
+          onClick={() => dep.trim().length === 3 && arr.trim().length === 3 && onLoad(dep.trim(), arr.trim())}
+          className="px-4 py-2.5 text-[0.875rem] font-semibold rounded-lg border-none bg-app-accent text-white cursor-pointer hover:bg-app-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
           Load history
         </button>
       </div>
@@ -456,12 +309,8 @@ function PriceHistoryRouteForm({
 
 function PlaneSVG({ large }: { large?: boolean }) {
   return (
-    <svg
-      className={large ? "app-hero-icon" : "app-brand-icon"}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden
-    >
+    <svg className={large ? "w-12 h-12 text-app-accent opacity-60" : "w-5 h-5 text-app-accent"}
+      viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" />
     </svg>
   );
@@ -469,35 +318,16 @@ function PlaneSVG({ large }: { large?: boolean }) {
 
 function SendIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M22 2L11 13" />
-      <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+    <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" />
     </svg>
   );
 }
 
 function MenuIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <line x1="3" y1="12" x2="21" y2="12" />
-      <line x1="3" y1="18" x2="21" y2="18" />
+    <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
     </svg>
   );
 }

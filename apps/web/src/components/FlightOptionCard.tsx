@@ -8,160 +8,130 @@ export interface FlightOptionCardProps {
   onSetAlert?: (target: AlertTarget) => void;
 }
 
-// ─── Formatting helpers ──────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatPrice(price: number | undefined): string {
+function formatPrice(price: number | undefined) {
   if (price == null || !Number.isFinite(price)) return "—";
   return `$${price.toLocaleString()}`;
 }
 
-function formatDuration(minutes: number | undefined): string {
+function formatDuration(minutes: number | undefined) {
   if (minutes == null || !Number.isFinite(minutes)) return "—";
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-function extractTime(datetimeStr: string | undefined): string {
-  if (!datetimeStr) return "—";
-  return datetimeStr.split(" ").pop() ?? "—";
+function extractTime(dt?: string) {
+  return dt ? (dt.split(" ").pop() ?? "—") : "—";
 }
 
-function extractDate(datetimeStr: string | undefined): string {
-  if (!datetimeStr) return "";
-  const datePart = datetimeStr.split(" ")[0];
-  if (!datePart) return "";
-  const [y, m, d] = datePart.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+function extractDate(dt?: string) {
+  if (!dt) return "";
+  const [y, m, d] = (dt.split(" ")[0] ?? "").split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function daysBetween(dep?: string, arr?: string): number {
+function daysBetween(dep?: string, arr?: string) {
   if (!dep || !arr) return 0;
-  const dp = dep.split(" ")[0];
-  const ap = arr.split(" ")[0];
+  const dp = dep.split(" ")[0]; const ap = arr.split(" ")[0];
   if (!dp || !ap || dp === ap) return 0;
   const [dy, dm, dd] = dp.split("-").map(Number);
   const [ay, am, ad] = ap.split("-").map(Number);
   return Math.round(
     (new Date(ay, (am ?? 1) - 1, ad ?? 1).getTime() -
-      new Date(dy, (dm ?? 1) - 1, dd ?? 1).getTime()) /
-      86_400_000,
+     new Date(dy, (dm ?? 1) - 1, dd ?? 1).getTime()) / 86_400_000,
   );
 }
 
-function stopsLabel(stops: number): string {
-  if (stops === 0) return "Nonstop";
-  if (stops === 1) return "1 stop";
-  return `${stops} stops`;
+function stopsLabel(n: number) {
+  if (n === 0) return "Nonstop";
+  if (n === 1) return "1 stop";
+  return `${n} stops`;
 }
 
-// ─── Airline logo ────────────────────────────────────────────────────────────
+// ─── Airline logo ─────────────────────────────────────────────────────────────
 
 function AirlineLogo({ src, alt }: { src?: string; alt: string }) {
-  if (!src) return <div className="foc-logo-placeholder" aria-hidden />;
+  if (!src) return <div className="w-7 h-7 shrink-0" aria-hidden />;
   return (
     <img
       src={src}
       alt={alt}
-      className="foc-logo"
-      onError={(e) => {
-        (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
-      }}
+      className="w-7 h-7 object-contain rounded-[5px] shrink-0"
+      onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
     />
   );
 }
 
-// ─── Expanded segment timeline ───────────────────────────────────────────────
+// ─── Segment timeline ─────────────────────────────────────────────────────────
 
-function SegmentTimeline({
-  segment,
-  layoverAfter,
-}: {
-  segment: FlightLeg;
-  layoverAfter?: LayoverInfo;
-}) {
-  const depDatetime = segment.departure_airport?.time;
-  const arrDatetime = segment.arrival_airport?.time;
-  const extraDays = daysBetween(depDatetime, arrDatetime);
+function SegmentTimeline({ segment, layoverAfter }: { segment: FlightLeg; layoverAfter?: LayoverInfo }) {
+  const dep = segment.departure_airport?.time;
+  const arr = segment.arrival_airport?.time;
+  const extraDays = daysBetween(dep, arr);
 
   return (
     <>
-      <div className="foc-tl">
-        {/* Departure row */}
-        <div className="foc-tl-time">
-          <span className="foc-tl-clock">{extractTime(depDatetime)}</span>
-          <span className="foc-tl-date">{extractDate(depDatetime)}</span>
+      {/* 3-col grid: time | node | info */}
+      <div className="grid grid-cols-[54px_20px_1fr]">
+        {/* Departure */}
+        <div className="flex flex-col items-end gap-[0.05rem] pt-0.5 pr-2">
+          <span className="text-[0.82rem] font-bold text-app-text whitespace-nowrap">{extractTime(dep)}</span>
+          <span className="text-[0.65rem] text-app-text-muted">{extractDate(dep)}</span>
         </div>
-        <div className="foc-tl-node">
-          <span className="foc-tl-dot" />
-          <span className="foc-tl-line" />
+        <div className="flex flex-col items-center">
+          <span className="w-2 h-2 rounded-full border-2 border-app-accent bg-app-bg shrink-0 mt-0.5" />
+          <span className="flex-1 w-0.5 bg-app-border min-h-6" />
         </div>
-        <div className="foc-tl-place">
-          <span className="foc-tl-code">{segment.departure_airport?.id}</span>
+        <div className="flex flex-col gap-[0.05rem] pl-2 pb-2">
+          <span className="text-[0.82rem] font-bold text-app-text">{segment.departure_airport?.id}</span>
           {segment.departure_airport?.name && (
-            <span className="foc-tl-name">{segment.departure_airport.name}</span>
+            <span className="text-[0.7rem] text-app-text-muted">{segment.departure_airport.name}</span>
           )}
         </div>
 
-        {/* Flight info row (middle of the line) */}
-        <div className="foc-tl-spacer" />
-        <div className="foc-tl-node foc-tl-node-mid">
-          <span className="foc-tl-line" />
+        {/* Flight meta (middle) */}
+        <div className="min-h-[0.35rem]" />
+        <div className="flex flex-col items-center">
+          <span className="flex-1 w-0.5 bg-app-border min-h-6" />
         </div>
-        <div className="foc-tl-meta">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.72rem] text-app-text-muted pl-2 py-0.5">
           {segment.airline_logo && (
-            <img
-              src={segment.airline_logo}
-              alt=""
-              className="foc-tl-seg-logo"
-              onError={(e) =>
-                ((e.currentTarget as HTMLImageElement).style.display = "none")
-              }
-            />
+            <img src={segment.airline_logo} alt="" className="w-3.5 h-3.5 object-contain rounded-sm shrink-0"
+              onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")} />
           )}
-          {segment.flight_number && (
-            <span className="foc-tl-flightnum">{segment.flight_number}</span>
-          )}
+          {segment.flight_number && <span className="font-semibold text-app-text">{segment.flight_number}</span>}
           {segment.travel_class && <span>· {segment.travel_class}</span>}
           {segment.airplane && <span>· {segment.airplane}</span>}
-          {segment.duration != null && (
-            <span>· {formatDuration(segment.duration)}</span>
-          )}
+          {segment.duration != null && <span>· {formatDuration(segment.duration)}</span>}
           {segment.legroom && <span>· {segment.legroom}</span>}
         </div>
 
-        {/* Arrival row */}
-        <div className="foc-tl-time">
-          <span className="foc-tl-clock">
-            {extractTime(arrDatetime)}
-            {extraDays > 0 && (
-              <sup className="foc-next-day">+{extraDays}</sup>
-            )}
+        {/* Arrival */}
+        <div className="flex flex-col items-end gap-[0.05rem] pt-0.5 pr-2">
+          <span className="text-[0.82rem] font-bold text-app-text whitespace-nowrap">
+            {extractTime(arr)}
+            {extraDays > 0 && <sup className="text-[0.58rem] font-bold text-app-accent align-super ml-0.5">+{extraDays}</sup>}
           </span>
-          <span className="foc-tl-date">{extractDate(arrDatetime)}</span>
+          <span className="text-[0.65rem] text-app-text-muted">{extractDate(arr)}</span>
         </div>
-        <div className="foc-tl-node foc-tl-node-last">
-          <span className="foc-tl-dot" />
+        <div className="flex flex-col items-center">
+          <span className="w-2 h-2 rounded-full border-2 border-app-accent bg-app-bg shrink-0 mt-0.5" />
         </div>
-        <div className="foc-tl-place">
-          <span className="foc-tl-code">{segment.arrival_airport?.id}</span>
+        <div className="flex flex-col gap-[0.05rem] pl-2 pb-2">
+          <span className="text-[0.82rem] font-bold text-app-text">{segment.arrival_airport?.id}</span>
           {segment.arrival_airport?.name && (
-            <span className="foc-tl-name">{segment.arrival_airport.name}</span>
+            <span className="text-[0.7rem] text-app-text-muted">{segment.arrival_airport.name}</span>
           )}
         </div>
       </div>
 
       {/* Layover pill */}
       {layoverAfter && (
-        <div className="foc-tl-layover">
+        <div className="flex items-center gap-1.5 my-0.5 ml-[74px] px-2.5 py-[0.3rem] bg-app-accent/[0.06] border border-app-accent/20 rounded-md text-[0.72rem] text-app-text-muted">
           <ClockIcon />
-          <span>
-            {formatDuration(layoverAfter.duration)} layover ·{" "}
-            {layoverAfter.name ?? layoverAfter.id}
-          </span>
+          <span>{formatDuration(layoverAfter.duration)} layover · {layoverAfter.name ?? layoverAfter.id}</span>
         </div>
       )}
     </>
@@ -172,16 +142,8 @@ function SegmentTimeline({
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
-    <svg
-      className={`foc-chevron ${open ? "foc-chevron-open" : ""}`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
+    <svg className={`w-[18px] h-[18px] text-app-text-muted transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
+      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <polyline points="6 9 12 15 18 9" />
     </svg>
   );
@@ -189,183 +151,147 @@ function ChevronIcon({ open }: { open: boolean }) {
 
 function ClockIcon() {
   return (
-    <svg
-      className="foc-clock-icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
+    <svg className="w-3 h-3 text-app-accent shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
     </svg>
   );
 }
 
 function LeafIcon() {
   return (
-    <svg
-      className="foc-leaf-icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
+    <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
       <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
     </svg>
   );
 }
 
-// ─── Main component ──────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function FlightOptionCard({ flight, isCheapest, onSetAlert }: FlightOptionCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   const segments = flight.flights ?? [];
-  const layovers = flight.layovers ?? [];
-  const stops = Math.max(0, segments.length - 1);
+  const layovers  = flight.layovers ?? [];
+  const stops     = Math.max(0, segments.length - 1);
 
   const firstSeg = segments[0];
-  const lastSeg = segments[segments.length - 1];
+  const lastSeg  = segments[segments.length - 1];
 
   const originDatetime = firstSeg?.departure_airport?.time;
-  const destDatetime = lastSeg?.arrival_airport?.time;
-  const originCode = firstSeg?.departure_airport?.id ?? "—";
-  const destCode = lastSeg?.arrival_airport?.id ?? "—";
-  const originTime = extractTime(originDatetime);
-  const destTime = extractTime(destDatetime);
+  const destDatetime   = lastSeg?.arrival_airport?.time;
+  const originCode     = firstSeg?.departure_airport?.id ?? "—";
+  const destCode       = lastSeg?.arrival_airport?.id   ?? "—";
   const routeExtraDays = daysBetween(originDatetime, destDatetime);
 
   const carrierLogo = flight.airline_logo ?? firstSeg?.airline_logo;
   const carrierName = flight.airline ?? firstSeg?.airline ?? "—";
 
-  const co2Diff = flight.carbon_emissions?.difference_percent;
+  const co2Diff  = flight.carbon_emissions?.difference_percent;
   const isLowCO2 = co2Diff != null && co2Diff < -5;
 
   return (
-    <article className={`foc ${expanded ? "foc-open" : ""}`}>
-      {/* ── Compact summary row (always visible, fully clickable) ── */}
+    <article className={`border-b border-app-border bg-app-surface-2 last:border-b-0 transition-[background] duration-[0.12s] ${expanded ? "" : "hover:bg-[#252530]"}`}>
+      {/* ── Summary row ── */}
       <button
         type="button"
-        className="foc-row"
+        className={`flex items-center w-full px-4 py-3 max-[620px]:px-3 max-[620px]:py-[0.65rem] bg-transparent border-none text-current cursor-pointer text-left transition-[background] duration-[0.12s] hover:bg-white/[0.03] ${expanded ? "bg-app-accent/[0.06]" : ""}`}
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={`${carrierName}, ${stopsLabel(stops)}, ${formatDuration(flight.total_duration)}, ${formatPrice(flight.price)}. Click to ${expanded ? "collapse" : "expand"} details.`}
       >
-        {/* Airline logo + name */}
-        <div className="foc-col foc-col-airline">
+        {/* Airline */}
+        <div className="flex flex-none w-[150px] max-[620px]:w-[120px] flex-row items-center gap-2 min-w-0 shrink-0">
           <AirlineLogo src={carrierLogo} alt={carrierName} />
-          <span className="foc-carrier-name">{carrierName}</span>
+          <span className="text-[0.82rem] font-semibold text-app-text whitespace-nowrap overflow-hidden text-ellipsis">{carrierName}</span>
         </div>
 
-        {/* Departure — Arrival times */}
-        <div className="foc-col foc-col-times">
-          <div className="foc-times">
-            <span className="foc-t">{originTime}</span>
-            <span className="foc-dash" aria-hidden>
-              —
-            </span>
-            <span className="foc-t">
-              {destTime}
-              {routeExtraDays > 0 && (
-                <sup className="foc-next-day">+{routeExtraDays}</sup>
-              )}
+        {/* Times */}
+        <div className="flex flex-col flex-none w-[140px] max-[620px]:w-[110px] justify-center gap-[0.15rem] shrink-0">
+          <div className="flex items-baseline gap-1">
+            <span className="text-[0.9rem] font-bold text-app-text whitespace-nowrap">{extractTime(originDatetime)}</span>
+            <span className="text-[0.75rem] text-app-text-subtle" aria-hidden>—</span>
+            <span className="text-[0.9rem] font-bold text-app-text whitespace-nowrap">
+              {extractTime(destDatetime)}
+              {routeExtraDays > 0 && <sup className="text-[0.58rem] font-bold text-app-accent align-super ml-0.5">+{routeExtraDays}</sup>}
             </span>
           </div>
-          <div className="foc-codes">
+          <div className="flex gap-5 text-[0.68rem] text-app-text-muted">
             <span>{originCode}</span>
             <span>{destCode}</span>
           </div>
         </div>
 
         {/* Duration */}
-        <div className="foc-col foc-col-duration">
-          <span className="foc-dur">{formatDuration(flight.total_duration)}</span>
-          <span className="foc-route-label">
-            {originCode}–{destCode}
-          </span>
+        <div className="flex flex-col flex-none w-[76px] max-[620px]:w-[60px] justify-center gap-[0.15rem] shrink-0">
+          <span className="text-[0.82rem] font-medium text-app-text">{formatDuration(flight.total_duration)}</span>
+          <span className="text-[0.68rem] text-app-text-muted">{originCode}–{destCode}</span>
         </div>
 
         {/* Stops */}
-        <div className="foc-col foc-col-stops">
-          <span className={`foc-stops-val ${stops === 0 ? "foc-nonstop" : ""}`}>
+        <div className="flex flex-col flex-none w-[72px] justify-center gap-[0.15rem] shrink-0 max-[620px]:hidden">
+          <span className={`text-[0.82rem] ${stops === 0 ? "text-app-green font-semibold" : "text-app-text-muted"}`}>
             {stopsLabel(stops)}
           </span>
         </div>
 
-        {/* CO₂ emissions */}
-        <div className="foc-col foc-col-co2">
+        {/* CO₂ */}
+        <div className="flex flex-col flex-1 min-w-0 justify-center gap-[0.15rem] max-[620px]:hidden">
           {co2Diff != null && (
-            <span className={`foc-co2-val ${isLowCO2 ? "foc-co2-low" : ""}`}>
+            <span className={`text-[0.72rem] whitespace-nowrap ${isLowCO2 ? "text-[#4ade80] bg-[rgba(74,222,128,0.1)] px-1.5 py-0.5 rounded self-start" : "text-app-text-muted"}`}>
               {co2Diff < 0 ? `−${Math.abs(co2Diff)}%` : `+${co2Diff}%`} CO₂
             </span>
           )}
         </div>
 
-        {/* Price + best badge */}
-        <div className="foc-col foc-col-price">
-          {isCheapest && <span className="foc-best-tag">Best price</span>}
-          <span className="foc-price">{formatPrice(flight.price)}</span>
-          {flight.type && (
-            <span className="foc-price-type">{flight.type.toLowerCase()}</span>
-          )}
+        {/* Price */}
+        <div className="flex flex-col flex-none w-[90px] items-end text-right justify-center gap-[0.15rem] shrink-0">
+          {isCheapest && <span className="text-[0.62rem] font-bold text-app-green tracking-[0.04em] uppercase">Best price</span>}
+          <span className="text-[1rem] font-extrabold text-app-text whitespace-nowrap">{formatPrice(flight.price)}</span>
+          {flight.type && <span className="text-[0.65rem] text-app-text-muted">{flight.type.toLowerCase()}</span>}
         </div>
 
-        {/* Expand chevron */}
-        <div className="foc-col foc-col-chevron" aria-hidden>
+        {/* Chevron */}
+        <div className="flex flex-col flex-none w-7 items-end justify-center shrink-0" aria-hidden>
           <ChevronIcon open={expanded} />
         </div>
       </button>
 
       {/* ── Expanded detail panel ── */}
       {expanded && (
-        <div className="foc-panel">
-          <div className="foc-panel-segments">
+        <div className="px-4 pb-4 border-t border-app-border-sub bg-black/[0.12]">
+          <div className="pt-[0.85rem] flex flex-col gap-0">
             {segments.map((seg, i) => (
-              <SegmentTimeline
-                key={i}
-                segment={seg}
-                layoverAfter={layovers[i]}
-              />
+              <SegmentTimeline key={i} segment={seg} layoverAfter={layovers[i]} />
             ))}
           </div>
 
-          <div className="foc-panel-footer">
+          {/* Footer */}
+          <div className="flex items-center justify-between flex-wrap gap-2 mt-3 pt-[0.65rem] border-t border-app-border-sub">
             {co2Diff != null && (
-              <div
-                className={`foc-co2-note ${co2Diff < 0 ? "foc-co2-note-good" : ""}`}
-              >
+              <div className={`flex items-center gap-1.5 text-[0.72rem] ${co2Diff < 0 ? "text-[#4ade80]" : "text-app-text-muted"}`}>
                 <LeafIcon />
                 {co2Diff < 0
                   ? `${Math.abs(co2Diff)}% less CO₂ than typical for this route`
                   : `${Math.abs(co2Diff)}% more CO₂ than typical for this route`}
               </div>
             )}
-            <div style={{ display: "flex", gap: "0.5rem", marginLeft: "auto" }}>
+            <div className="flex gap-2 ml-auto">
               {onSetAlert && (
                 <button
                   type="button"
-                  className="foc-alert-btn"
-                  onClick={() =>
-                    onSetAlert({
-                      departureId: originCode === "—" ? "" : originCode,
-                      arrivalId: destCode === "—" ? "" : destCode,
-                      outboundDate: originDatetime?.split(" ")[0] ?? "",
-                      currentPrice: flight.price,
-                    })
-                  }
+                  className="px-4 py-2 text-[0.8rem] font-semibold rounded-lg border border-app-border bg-transparent text-app-text-muted cursor-pointer whitespace-nowrap transition-all hover:border-app-accent hover:text-app-accent hover:bg-app-accent/15"
+                  onClick={() => onSetAlert({
+                    departureId: originCode === "—" ? "" : originCode,
+                    arrivalId:   destCode   === "—" ? "" : destCode,
+                    outboundDate: originDatetime?.split(" ")[0] ?? "",
+                    currentPrice: flight.price,
+                  })}
                 >
                   🔔 Set Alert
                 </button>
               )}
-              <button type="button" className="foc-select-btn">
+              <button type="button" className="px-5 py-2 text-[0.85rem] font-semibold rounded-lg border-2 border-app-accent bg-transparent text-app-accent cursor-pointer shrink-0 transition-all hover:bg-app-accent hover:text-white">
                 Select flight
               </button>
             </div>
